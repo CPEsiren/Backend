@@ -24,8 +24,8 @@ app.get("/", (req: Request, res: Response) => {
 
 app.get("/getUser", async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findMany();
-    res.json(user);
+    const User = await prisma.user.findMany();
+    res.json(User);
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: "Internal Server Error", details: error });
@@ -34,8 +34,8 @@ app.get("/getUser", async (req: Request, res: Response) => {
 
 app.get("/getDevice", async (req: Request, res: Response) => {
   try {
-    const user = await prisma.user.findMany();
-    res.json(user);
+    const Device = await prisma.device.findMany();
+    res.json(Device);
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: "Internal Server Error", details: error });

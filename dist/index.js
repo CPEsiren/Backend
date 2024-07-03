@@ -32,8 +32,8 @@ app.get("/", (req, res) => {
 });
 app.get("/getUser", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = yield prisma.user.findMany();
-        res.json(user);
+        const User = yield prisma.user.findMany();
+        res.json(User);
     }
     catch (error) {
         console.error("Error fetching users:", error);
@@ -42,8 +42,8 @@ app.get("/getUser", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 }));
 app.get("/getDevice", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = yield prisma.user.findMany();
-        res.json(user);
+        const Device = yield prisma.device.findMany();
+        res.json(Device);
     }
     catch (error) {
         console.error("Error fetching users:", error);
