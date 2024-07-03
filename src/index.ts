@@ -2,10 +2,11 @@ import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import cors from "cors";
-import mysql from "mysql2";
+import { PrismaClient } from "@prisma/client";
 
 dotenv.config();
 
+const prisma = new PrismaClient();
 const app: Express = express();
 const port: string | undefined = process.env.PORT;
 
@@ -17,48 +18,28 @@ if (!port) {
 app.use(cors());
 app.use(bodyParser.json());
 
-const db = mysql.createPool({
-  connectionLimit: 10,
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || "16838"),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
-
-db.getConnection((err: any, connection: { release: () => void }) => {
-  if (err) {
-    console.error("Error connecting to the database:", err);
-    return;
-  }
-  if (connection) connection.release();
-  console.log("Connected to the database");
-});
-
 app.get("/", (req: Request, res: Response) => {
   res.send("Our Server");
 });
 
-app.get("/getUser", (req: Request, res: Response) => {
-  db.query("SELECT * FROM User", (err: any, user: any) => {
-    if (err) {
-      console.error("Error fetching user:", err);
-      res.status(500).json({ error: "Internal Server Error", details: err });
-      return;
-    }
+app.get("/getUser", async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findMany();
     res.json(user);
-  });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error });
+  }
 });
 
-app.get("/getDevice", (req: Request, res: Response) => {
-  db.query("SELECT * FROM Device", (err: any, device: any) => {
-    if (err) {
-      console.error("Error fetching device:", err);
-      res.status(500).json({ error: "Internal Server Error", details: err });
-      return;
-    }
-    res.json(device);
-  });
+app.get("/getDevice", async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findMany();
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error });
+  }
 });
 
 app.use((err: any, req: Request, res: Response, next: any) => {

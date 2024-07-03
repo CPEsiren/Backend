@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,8 +16,9 @@ const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const cors_1 = __importDefault(require("cors"));
-const mysql2_1 = __importDefault(require("mysql2"));
+const client_1 = require("@prisma/client");
 dotenv_1.default.config();
+const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
 const port = process.env.PORT;
 if (!port) {
@@ -17,46 +27,29 @@ if (!port) {
 }
 app.use((0, cors_1.default)());
 app.use(body_parser_1.default.json());
-const db = mysql2_1.default.createPool({
-    connectionLimit: 10,
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || "16838"),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-});
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error("Error connecting to the database:", err);
-        return;
-    }
-    if (connection)
-        connection.release();
-    console.log("Connected to the database");
-});
 app.get("/", (req, res) => {
     res.send("Our Server");
 });
-app.get("/getUser", (req, res) => {
-    db.query("SELECT * FROM User", (err, user) => {
-        if (err) {
-            console.error("Error fetching user:", err);
-            res.status(500).json({ error: "Internal Server Error", details: err });
-            return;
-        }
+app.get("/getUser", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = yield prisma.user.findMany();
         res.json(user);
-    });
-});
-app.get("/getDevice", (req, res) => {
-    db.query("SELECT * FROM Device", (err, device) => {
-        if (err) {
-            console.error("Error fetching device:", err);
-            res.status(500).json({ error: "Internal Server Error", details: err });
-            return;
-        }
-        res.json(device);
-    });
-});
+    }
+    catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error });
+    }
+}));
+app.get("/getDevice", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = yield prisma.user.findMany();
+        res.json(user);
+    }
+    catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error });
+    }
+}));
 app.use((err, req, res, next) => {
     console.error("Unhandled error:", err);
     res.status(500).json({ error: "Something went wrong!", details: err });
