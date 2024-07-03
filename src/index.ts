@@ -39,14 +39,25 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Our Server");
 });
 
-app.get("/api/getUsers", (req: Request, res: Response) => {
-  db.query("SELECT * FROM Users", (err: any, users: any) => {
+app.get("/getUser", (req: Request, res: Response) => {
+  db.query("SELECT * FROM User", (err: any, user: any) => {
     if (err) {
-      console.error("Error fetching users:", err);
+      console.error("Error fetching user:", err);
       res.status(500).json({ error: "Internal Server Error", details: err });
       return;
     }
-    res.json(users);
+    res.json(user);
+  });
+});
+
+app.get("/getDevice", (req: Request, res: Response) => {
+  db.query("SELECT * FROM Device", (err: any, device: any) => {
+    if (err) {
+      console.error("Error fetching device:", err);
+      res.status(500).json({ error: "Internal Server Error", details: err });
+      return;
+    }
+    res.json(device);
   });
 });
 
