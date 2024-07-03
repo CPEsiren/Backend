@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DB_URL")
+}
+
+model User {
+  Id        Int      @id @default(autoincrement())
+  FName String?  @db.VarChar(255)
+  LName  String?  @db.VarChar(255)
+  Email     String   @unique @db.VarChar(255)
+  isAdmin   Boolean  @default(false)
+  Password  String?  @db.VarChar(255)
+  Role  String?  @db.VarChar(255)
+
+  @@unique([FName, LName], name: "User_UN")
+}
+
+model Device {
+  DMACaddress          String    @id @db.VarChar(255)
+  DName        String?   @unique @db.VarChar(255)
+  Location    String?   @db.VarChar(255)
+  Hardware    String?   @db.VarChar(255)
+  Os          String?   @db.VarChar(255)
+  Type        String?   @db.VarChar(255)
+  Vendor      String?   @db.VarChar(255)
+  Room        String?   @db.VarChar(255)
+  Status      Boolean   @default(false)
+  graphs      Graph[]
+}
+
+model Interface {
+  IntMACaddress          String    @id @db.VarChar(255)
+  IntName        String?   @unique @db.VarChar(255)
+  IPaddress   String?   @db.VarChar(255)
+  Speed       Int
+  Status      Boolean   @default(false)
+}
+
+model Graph {
+  GID          String    @id @default(uuid())
+  DMACaddress    String    @db.VarChar(255)
+  GName    String    @db.VarChar(255)
+  GDetail    String    @db.VarChar(255)
+  Device      Device    @relation(fields: [DMACaddress], references: [DMACaddress], onDelete: Cascade)
+}
+
+model Alert {
+  Problem       String    @id @db.VarChar(255)
+  ProblemStatus Boolean   @default(false)
+  AlertDetail   String    @db.VarChar(255)
+  Area          String    @db.VarChar(255)
+  StartDate     DateTime  @db.Date
+  EndDate       DateTime  @db.Date
+  StartTime     DateTime  @db.Time(0)
+  EndTime       DateTime  @db.Time(0)
+}
