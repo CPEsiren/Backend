@@ -4,7 +4,10 @@ import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import cors from "cors";
 import User from "./routes/Userapi";
-import Device from "./routes/Deviceapi";
+// import Device from "./routes/Deviceapi";
+import Interface from "./routes/Interfaceapi"
+import Alert from "./routes/Alertapi"
+import deviceRoutes from './routes/Deviceapi';
 
 dotenv.config();
 
@@ -18,7 +21,9 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/getUser", User);
-app.use("/getDevice", Device);
+app.use('/getDevice', deviceRoutes);
+app.use("/getInterface", Interface);
+app.use("/getAlert", Alert);
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "Something went wrong!", details: err });

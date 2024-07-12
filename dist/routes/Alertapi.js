@@ -12,35 +12,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// src/routes/deviceRoutes.ts
 const express_1 = require("express");
 const prismaClient_1 = __importDefault(require("../prismaClient"));
 const router = (0, express_1.Router)();
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const devices = yield prismaClient_1.default.device.findMany();
-        res.json(devices);
+        const alerts = yield prismaClient_1.default.alert.findMany();
+        res.json(alerts);
     }
     catch (error) {
-        console.error("Error fetching devices:", error);
-        res.status(500).json({ error: "Internal Server Error", details: error });
-    }
-}));
-// Add a route to get a single device by DMACaddress
-router.get("/:dmacAddress", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { dmacAddress } = req.params;
-    try {
-        const device = yield prismaClient_1.default.device.findUnique({
-            where: { DMACaddress: dmacAddress },
-        });
-        if (device) {
-            res.json(device);
-        }
-        else {
-            res.status(404).json({ error: "Device not found" });
-        }
-    }
-    catch (error) {
-        console.error("Error fetching device:", error);
+        console.error("Error fetching alert:", error);
         res.status(500).json({ error: "Internal Server Error", details: error });
     }
 }));
