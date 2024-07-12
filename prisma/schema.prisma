@@ -11,53 +11,56 @@ datasource db {
 }
 
 model User {
-  Id        Int      @id @default(autoincrement())
-  FName String?  @db.VarChar(255)
-  LName  String?  @db.VarChar(255)
-  Email     String   @unique @db.VarChar(255)
+  id        Int      @id @default(autoincrement())
+  firstName String?  @map("FName") @db.VarChar(255)
+  lastName  String?  @map("LName") @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
   isAdmin   Boolean  @default(false)
-  Password  String?  @db.VarChar(255)
-  Role  String?  @db.VarChar(255)
+  password  String?  @db.VarChar(255)
+  role      String?  @db.VarChar(255)
 
-  @@unique([FName, LName], name: "User_UN")
+  @@unique([firstName, lastName], name: "User_UN")
 }
 
 model Device {
-  DMACaddress          String    @id @db.VarChar(255)
-  DName        String?   @unique @db.VarChar(255)
-  Location    String?   @db.VarChar(255)
-  Hardware    String?   @db.VarChar(255)
-  Os          String?   @db.VarChar(255)
-  Type        String?   @db.VarChar(255)
-  Vendor      String?   @db.VarChar(255)
-  Room        String?   @db.VarChar(255)
-  Status      Boolean   @default(false)
-  graphs      Graph[]
+  macAddress     String    @id @map("DMACaddress") @db.VarChar(255)
+  interfaceMac   String    @map("IntMACaddress") @db.VarChar(255)
+  Dname           String?  @db.VarChar(255)
+  location       String?   @db.VarChar(255)
+  hardware       String?   @db.VarChar(255)
+  os             String?   @db.VarChar(255)
+  type           String?   @db.VarChar(255)
+  vendor         String?   @db.VarChar(255)
+  room           String?   @db.VarChar(255)
+  status         Boolean   @default(false)
+  graphs         Graph[]
+  interface      Interface @relation(fields: [interfaceMac], references: [macAddress], onDelete: Cascade)
 }
 
 model Interface {
-  IntMACaddress          String    @id @db.VarChar(255)
-  IntName        String?   @unique @db.VarChar(255)
-  IPaddress   String?   @db.VarChar(255)
-  Speed       Int
-  Status      Boolean   @default(false)
+  macAddress  String   @id @map("IntMACaddress") @db.VarChar(255)
+  Intname     String?  @unique @map("IntName") @db.VarChar(255)
+  ipAddress   String?  @map("IPaddress") @db.VarChar(255)
+  speed       Int
+  status      Boolean  @default(false)
+  devices     Device[]
 }
 
 model Graph {
-  GID          String    @id @default(uuid())
-  DMACaddress    String    @db.VarChar(255)
-  GName    String    @db.VarChar(255)
-  GDetail    String    @db.VarChar(255)
-  Device      Device    @relation(fields: [DMACaddress], references: [DMACaddress], onDelete: Cascade)
+  id            String  @id @default(uuid()) @map("GID")
+  deviceMac     String  @map("DMACaddress") @db.VarChar(255)
+  name          String  @map("GName") @db.VarChar(255)
+  detail        String  @map("GDetail") @db.VarChar(255)
+  device        Device  @relation(fields: [deviceMac], references: [macAddress], onDelete: Cascade)
 }
 
 model Alert {
-  Problem       String    @id @db.VarChar(255)
-  ProblemStatus Boolean   @default(false)
-  AlertDetail   String    @db.VarChar(255)
-  Area          String    @db.VarChar(255)
-  StartDate     DateTime  @db.Date
-  EndDate       DateTime  @db.Date
-  StartTime     DateTime  @db.Time(0)
-  EndTime       DateTime  @db.Time(0)
+  problem       String   @id @db.VarChar(255)
+  problemStatus Boolean  @default(false)
+  alertDetail   String   @db.VarChar(255)
+  area          String   @db.VarChar(255)
+  startDate     DateTime @db.Date
+  endDate       DateTime @db.Date
+  startTime     DateTime @db.Time(0)
+  endTime       DateTime @db.Time(0)
 }
