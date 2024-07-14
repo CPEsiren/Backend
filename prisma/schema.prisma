@@ -69,4 +69,5 @@ model Details {
   Dname       String?   @db.VarChar(255)
   room        String?   @db.VarChar(255)
   status      Boolean   @default(false)
+  location    String?   @db.VarChar(255)
 }

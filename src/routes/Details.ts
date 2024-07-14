@@ -11,6 +11,7 @@ router.get("/", async (req: Request, res: Response) => {
         DName: true,
         Room: true,
         Status: true,
+        Location: true,
       },
     });
     res.json(devices);
