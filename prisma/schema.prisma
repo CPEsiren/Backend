@@ -23,35 +23,35 @@ model User {
 }
 
 model Device {
-  macAddress     String    @id @map("DMACaddress") @db.VarChar(255)
-  interfaceMac   String    @map("IntMACaddress") @db.VarChar(255)
-  Dname           String?  @db.VarChar(255)
-  location       String?   @db.VarChar(255)
-  hardware       String?   @db.VarChar(255)
-  os             String?   @db.VarChar(255)
-  type           String?   @db.VarChar(255)
-  vendor         String?   @db.VarChar(255)
-  room           String?   @db.VarChar(255)
-  status         Boolean   @default(false)
-  graphs         Graph[]
-  interface      Interface @relation(fields: [interfaceMac], references: [macAddress], onDelete: Cascade)
+  DMACaddress String    @id @map("DMACaddress") @db.VarChar(255)
+  Dname       String?   @db.VarChar(255)
+  location    String?   @db.VarChar(255)
+  hardware    String?   @db.VarChar(255)
+  os          String?   @db.VarChar(255)
+  type        String?   @db.VarChar(255)
+  vendor      String?   @db.VarChar(255)
+  room        String?   @db.VarChar(255)
+  status      Boolean   @default(false)
+  graphs      Graph[]
+  interfaces  Interface[]
 }
 
 model Interface {
-  macAddress  String   @id @map("IntMACaddress") @db.VarChar(255)
-  Intname     String?  @unique @map("IntName") @db.VarChar(255)
-  ipAddress   String?  @map("IPaddress") @db.VarChar(255)
-  speed       Int
-  status      Boolean  @default(false)
-  devices     Device[]
+  ImacAddress  String   @id @map("IntMACaddress") @db.VarChar(255)
+  Intname      String?  @unique @map("IntName") @db.VarChar(255)
+  ipAddress    String?  @map("IPaddress") @db.VarChar(255)
+  speed        Int
+  status       Boolean  @default(false)
+  DMACaddress  String   @map("DMACaddress") @db.VarChar(255)
+  device       Device   @relation(fields: [DMACaddress], references: [DMACaddress], onDelete: Cascade)
 }
 
 model Graph {
-  id            String  @id @default(uuid()) @map("GID")
-  deviceMac     String  @map("DMACaddress") @db.VarChar(255)
-  name          String  @map("GName") @db.VarChar(255)
-  detail        String  @map("GDetail") @db.VarChar(255)
-  device        Device  @relation(fields: [deviceMac], references: [macAddress], onDelete: Cascade)
+  id           String  @id @default(uuid()) @map("GID")
+  DMACaddress  String  @map("DMACaddress") @db.VarChar(255)
+  name         String  @map("GName") @db.VarChar(255)
+  detail       String  @map("GDetail") @db.VarChar(255)
+  device       Device  @relation(fields: [DMACaddress], references: [DMACaddress], onDelete: Cascade)
 }
 
 model Alert {
