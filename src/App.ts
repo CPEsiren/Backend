@@ -6,28 +6,42 @@ import cors from "cors";
 import User from "./routes/Userapi";
 import Interface from "./routes/Interfaceapi";
 import Alert from "./routes/Alertapi";
-import deviceRoutes from "./routes/Deviceapi";
-
-dotenv.config();
+import Host from "./routes/Host";
+import SNMP from "./routes/DataSNMP";
+import { MongoClient } from "mongodb";
+import { env } from "process";
 
 const app: Express = express();
 
-app.use(cors());
-app.use(bodyParser.json());
+async function start() {
+  try {
+    dotenv.config();
 
-app.get("/", (req: Request, res: Response) => {
-  res.send("Our Server");
-});
+    app.use(cors());
+    app.use(bodyParser.json());
 
-app.use("/getUser", User);
-app.use("/getDevice", deviceRoutes);
-app.use("/getInterface", Interface);
-app.use("/getAlert", Alert);
-// app.use("/getGraph", Graph);
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      console.log(`${req.method} ${req.url}`);
+      next();
+    });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error("Unhandled error:", err);
-  res.status(500).json({ error: "Something went wrong!" });
-});
+    app.get("/", (req: Request, res: Response) => {
+      res.send("Our Server");
+    });
+
+    app.use("/getUser", User);
+    app.use("/getInterface", Interface);
+    app.use("/getAlert", Alert);
+    app.use("/SNMP", SNMP);
+    app.use("/host", Host);
+    app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+      console.error("Unhandled error:", err);
+      res.status(500).json({ error: "Something went wrong!" });
+    });
+  } catch (err) {
+    console.log(err);
+  }
+}
+start();
 
 export default app;
