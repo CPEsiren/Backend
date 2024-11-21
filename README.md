@@ -2,10 +2,8 @@ Install
 
 npm install
 
-npm install nodemon
+!!!!dont't forget to fill .env file
 
-npm install cors
+npm run build
 
-npx prisma generate(when edited schema)
-
-dont't forget to fill .env file
+npm start
