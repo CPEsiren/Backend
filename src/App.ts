@@ -7,7 +7,7 @@ import User from "./routes/Userapi";
 import Interface from "./routes/Interfaceapi";
 import Alert from "./routes/Alertapi";
 import Host from "./routes/Host";
-import SNMP from "./routes/DataSNMP";
+import SNMP from "./routes/Snmp";
 import { MongoClient } from "mongodb";
 import { env } from "process";
 
