@@ -1,12 +1,10 @@
 import { Router, Request, Response } from "express";
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 
 const router = Router();
 
 dotenv.config();
-
-router.get("/");
 
 const client = new MongoClient(`${process.env.Database_url}` || "");
 
@@ -14,7 +12,7 @@ router.get("/", async (req: Request, res: Response) => {
   try {
     await client.connect();
     const db = client.db("CPE-siren");
-    const collection = db.collection("Host");
+    const collection = db.collection("Hosts");
 
     const data = await collection.find().toArray();
     res.status(200).json({
@@ -34,23 +32,48 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/add", async (req: Request, res: Response) => {
+router.post("/createHost", async (req: Request, res: Response) => {
   try {
-    const { hostname, templates, hostgroup, inface } = req.body;
+    const {
+      host_id,
+      hostname,
+      ip_address,
+      snmp_port,
+      snmp_version,
+      snmp_community,
+      hostgroup,
+      status,
+      templates,
+    } = req.body;
 
-    if (!hostname || !templates || !hostgroup || !inface) {
+    if (
+      !host_id ||
+      !hostname ||
+      !ip_address ||
+      !snmp_version ||
+      !snmp_community ||
+      !hostgroup ||
+      !status ||
+      !templates ||
+      !snmp_port
+    ) {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
     await client.connect();
     const db = client.db("CPE-siren");
-    const collection = db.collection("Host");
+    const collection = db.collection("Hosts");
 
     const result = await collection.insertOne({
+      _id: host_id,
       hostname,
-      templates,
+      ip_address,
+      snmp_port,
+      snmp_version,
+      snmp_community,
       hostgroup,
-      inface,
+      status,
+      templates,
       createdAt: new Date().toLocaleString("th-TH", {
         timeZone: "Asia/Bangkok",
       }),
@@ -72,7 +95,7 @@ router.post("/add", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/delete/:id", async (req: Request, res: Response) => {
+router.delete("/deleteHost/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -82,9 +105,9 @@ router.delete("/delete/:id", async (req: Request, res: Response) => {
 
     await client.connect();
     const db = client.db("CPE-siren");
-    const collection = db.collection("Host");
+    const collection = db.collection("Hosts");
 
-    const result = await collection.deleteOne({ _id: new ObjectId(id) });
+    const result = await collection.deleteOne({ _id: parseInt(id) as any });
 
     if (result.deletedCount === 0) {
       return res

@@ -8,8 +8,8 @@ import Interface from "./routes/Interfaceapi";
 import Alert from "./routes/Alertapi";
 import Host from "./routes/Host";
 import SNMP from "./routes/Snmp";
-import { MongoClient } from "mongodb";
-import { env } from "process";
+import Template from "./routes/Template";
+import Item from "./routes/Item";
 
 const app: Express = express();
 
@@ -33,13 +33,17 @@ async function start() {
     app.use("/getInterface", Interface);
     app.use("/getAlert", Alert);
     app.use("/SNMP", SNMP);
+
     app.use("/host", Host);
+    // app.use("/template", Template);
+    // app.use("/item", Item);
+
     app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
       console.error("Unhandled error:", err);
       res.status(500).json({ error: "Something went wrong!" });
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
   }
 }
 start();
