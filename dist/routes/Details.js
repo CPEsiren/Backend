@@ -1,9 +1,8 @@
+"use strict";
 // // src/routes/Details.ts
 // import { Router, Request, Response } from "express";
 // import prisma from "../prismaClient";
-
 // const router = Router();
-
 // router.get("/", async (req: Request, res: Response) => {
 //   try {
 //     const devices = await prisma.device.findMany({
@@ -19,5 +18,4 @@
 //     res.status(500).json({ error: "Internal Server Error", details: error });
 //   }
 // });
-
 // export default router;

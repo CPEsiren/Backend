@@ -7,7 +7,7 @@ import User from "./routes/Userapi";
 import Interface from "./routes/Interfaceapi";
 import Alert from "./routes/Alertapi";
 import deviceRoutes from "./routes/Deviceapi";
-import Details from "./routes/Details";
+// import Details from "./routes/Details";
 
 dotenv.config();
 
@@ -24,7 +24,7 @@ app.use("/getUser", User);
 app.use("/getDevice", deviceRoutes);
 app.use("/getInterface", Interface);
 app.use("/getAlert", Alert);
-app.use("/getDetails", Details);
+// app.use("/getDetails", Details);
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error("Unhandled error:", err);
