@@ -22,14 +22,20 @@ const Interfaceapi_1 = __importDefault(require("./routes/Interfaceapi"));
 const Alertapi_1 = __importDefault(require("./routes/Alertapi"));
 const Deviceapi_1 = __importDefault(require("./routes/Deviceapi"));
 const Host_1 = __importDefault(require("./routes/Host"));
-// import Template from "./routes/Template";
-// import Item from "./routes/Item";
-// import History from "./routes/History";
+const Template_1 = __importDefault(require("./routes/Template"));
+const Item_1 = __importDefault(require("./routes/Item"));
+const History_1 = __importDefault(require("./routes/History"));
 // import Details from "./routes/Details";
+const errorMiddleware_1 = require("./middlewares/errorMiddleware");
+const database_1 = require("./services/database");
+const snmpService_1 = require("./services/snmpService");
 const app = (0, express_1.default)();
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            (0, database_1.connectDb)().catch((error) => {
+                console.error("Failed to start app due to database connection error", error);
+            });
             dotenv_1.default.config();
             app.use((0, cors_1.default)());
             app.use(body_parser_1.default.json());
@@ -46,13 +52,24 @@ function start() {
             app.use("/getAlert", Alertapi_1.default);
             // app.use("/getDetails", Details);
             app.use("/host", Host_1.default);
-            // app.use("/template", Template);
-            // app.use("/item", Item);
-            // app.use("/history", History);
+            app.use("/template", Template_1.default);
+            app.use("/item", Item_1.default);
+            app.use("/history", History_1.default);
+            setInterval(() => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    console.log("Fetching and storing SNMP data...");
+                    const results = yield (0, snmpService_1.fetchAndStoreSnmpData)();
+                    console.log("SNMP data stored:", results.length, "entries.");
+                }
+                catch (error) {
+                    console.error("Error in scheduled SNMP data fetching:", error);
+                }
+            }), 10000);
             app.use((err, req, res, next) => {
                 console.error("Unhandled error:", err);
                 res.status(500).json({ error: "Something went wrong!" });
             });
+            app.use(errorMiddleware_1.errorHandler);
         }
         catch (err) {
             console.error(err);

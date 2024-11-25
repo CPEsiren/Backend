@@ -1,4 +1,6 @@
+import { body, validationResult } from "express-validator";
 import { Router, Request, Response } from "express";
+import { getDb } from "../services/database";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 
@@ -10,8 +12,7 @@ const client = new MongoClient(`${process.env.Database_url}` || "");
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    await client.connect();
-    const db = client.db("CPE-siren");
+    const db = getDb();
     const collection = db.collection("Hosts");
 
     const data = await collection.find().toArray();
@@ -26,61 +27,54 @@ router.get("/", async (req: Request, res: Response) => {
       error: "Failed to fetch data.",
       details: err instanceof Error ? err.message : "Unknown error",
     });
-  } finally {
-    // ปิดการเชื่อมต่อ
-    await client.close();
   }
 });
 
-router.post("/createHost", async (req: Request, res: Response) => {
-  try {
-    const data = req.body;
+router.post(
+  "/createHost",
+  [
+    body("hostname").notEmpty().withMessage("Hostname is required"),
+    body("ip_address").isIP().withMessage("Invalid IP address"),
+    body("snmp_port").notEmpty().withMessage("SNMP port is required"),
+    body("snmp_version").notEmpty().withMessage("SNMP version is required"),
+    body("snmp_community").notEmpty().withMessage("SNMP community is required"),
+    body("hostgroup").notEmpty().withMessage("Hostgroup is required"),
+    body("templates").notEmpty().withMessage("Templates is required"),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
 
-    const reqFields = [
-      "hostname",
-      "ip_address",
-      "snmp_port",
-      "snmp_version",
-      "snmp_community",
-      "hostgroup",
-      "status",
-      "templates",
-    ];
-
-    for (const field of reqFields) {
-      if (!data[field]) {
-        return res
-          .status(400)
-          .json({ error: `Missing required field: ${field}` });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
       }
+
+      const db = getDb();
+      const collection = db.collection("Hosts");
+
+      const result = await collection.insertOne({
+        ...data,
+        status: 0,
+        createdAt: new Date().toLocaleString("th-TH", {
+          timeZone: "Asia/Bangkok",
+        }),
+      });
+
+      res.status(201).json({
+        message: "Data added successfully.",
+        data: result,
+      });
+    } catch (err) {
+      console.error("Error adding data:", err);
+
+      res.status(500).json({
+        error: "Failed to add data.",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
     }
-
-    await client.connect();
-    const db = client.db("CPE-siren");
-    const collection = db.collection("Hosts");
-
-    const result = await collection.insertOne({
-      ...data,
-      createdAt: new Date().toLocaleString("th-TH", {
-        timeZone: "Asia/Bangkok",
-      }),
-    });
-
-    res.status(201).json({
-      message: "Data added successfully.",
-      data: result,
-    });
-  } catch (err) {
-    console.error("Error adding data:", err);
-
-    res.status(500).json({
-      error: "Failed to add data.",
-      details: err instanceof Error ? err.message : "Unknown error",
-    });
-  } finally {
-    await client.close();
   }
-});
+);
 
 router.delete("/deleteHost/:id", async (req: Request, res: Response) => {
   try {
@@ -90,8 +84,7 @@ router.delete("/deleteHost/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing required parameter: id" });
     }
 
-    await client.connect();
-    const db = client.db("CPE-siren");
+    const db = getDb();
     const collection = db.collection("Hosts");
 
     const result = await collection.deleteOne({ _id: parseInt(id) as any });
@@ -112,8 +105,6 @@ router.delete("/deleteHost/:id", async (req: Request, res: Response) => {
       error: "Failed to delete data.",
       details: err instanceof Error ? err.message : "Unknown error",
     });
-  } finally {
-    await client.close();
   }
 });
 

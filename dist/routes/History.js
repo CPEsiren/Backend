@@ -12,7 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const snmpService_1 = require("../services/snmpService");
+const express_validator_1 = require("express-validator");
 const express_1 = require("express");
+const database_1 = require("../services/database");
 const mongodb_1 = require("mongodb");
 const dotenv_1 = __importDefault(require("dotenv"));
 const router = (0, express_1.Router)();
@@ -20,8 +23,7 @@ dotenv_1.default.config();
 const client = new mongodb_1.MongoClient(`${process.env.Database_url}` || "");
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Histories");
         const data = yield collection.find().toArray();
         res.status(200).json({
@@ -36,19 +38,18 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        // ปิดการเชื่อมต่อ
-        yield client.close();
-    }
 }));
-router.post("/createHistory", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/createHistory", [
+    (0, express_validator_1.body)("item_id").notEmpty().withMessage("Item id is required"),
+    (0, express_validator_1.body)("host_id").notEmpty().withMessage("Host id is required"),
+], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { item_id, host_id } = req.body;
-        if (!item_id || !host_id) {
-            return res.status(400).json({ error: "Missing required fields." });
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const data = req.body;
+        const db = (0, database_1.getDb)();
         const collections = yield db
             .listCollections({ name: "Histories" })
             .toArray();
@@ -57,19 +58,16 @@ router.post("/createHistory", (req, res) => __awaiter(void 0, void 0, void 0, fu
                 timeseries: {
                     timeField: "timestamp",
                     metaField: "metadata",
-                    granularity: "minutes",
+                    granularity: "seconds",
                 },
-                expireAfterSeconds: 9000,
+                expireAfterSeconds: 86400,
             });
         }
         const collection = db.collection("Histories");
         const result = yield collection.insertOne({
+            metadata: Object.assign({}, data),
             timestamp: new Date(),
-            metadata: {
-                item_id,
-                host_id,
-            },
-            value: 20,
+            value: data.value || 20,
         });
         res.status(201).json({
             message: "Data added successfully.",
@@ -83,9 +81,6 @@ router.post("/createHistory", (req, res) => __awaiter(void 0, void 0, void 0, fu
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        yield client.close();
-    }
 }));
 router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -93,8 +88,7 @@ router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0,
         if (!id) {
             return res.status(400).json({ error: "Missing required parameter: id" });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Items");
         const result = yield collection.deleteOne({ _id: parseInt(id) });
         if (result.deletedCount === 0) {
@@ -113,8 +107,21 @@ router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0,
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        yield client.close();
+}));
+router.get("/fetchAndStoreSnmpData", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const results = yield (0, snmpService_1.fetchAndStoreSnmpData)();
+        res.status(201).json({
+            message: "SNMP data fetched and stored successfully.",
+            data: results,
+        });
+    }
+    catch (err) {
+        console.error("Error fetching and storing SNMP data:", err);
+        res.status(500).json({
+            error: "Failed to fetch and store SNMP data.",
+            details: err instanceof Error ? err.message : "Unknown error",
+        });
     }
 }));
 exports.default = router;

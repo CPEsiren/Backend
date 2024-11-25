@@ -23,19 +23,18 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSubTree = exports.getOne = void 0;
+exports.createSnmpSession = exports.getSubTree = exports.getSnmpData = void 0;
 const snmp = __importStar(require("net-snmp"));
-const getOne = (oids, session) => {
+const getSnmpData = (oid, session) => {
     return new Promise((resolve, reject) => {
         const snmpData = [];
-        session.get(oids, (error, varbinds) => {
+        session.get([oid], (error, varbinds) => {
             if (error) {
                 session.close();
                 reject(error.toString());
             }
             else {
-                for (let i = 0; i < varbinds.length; i++) {
-                    const varbind = varbinds[i];
+                for (const varbind of varbinds) {
                     if (snmp.isVarbindError(varbind)) {
                         session.close();
                         reject(snmp.varbindError(varbind));
@@ -53,7 +52,7 @@ const getOne = (oids, session) => {
         });
     });
 };
-exports.getOne = getOne;
+exports.getSnmpData = getSnmpData;
 const getSubTree = (oid, session) => {
     return new Promise((resolve, rejects) => {
         let snmpData = [];
@@ -88,34 +87,7 @@ const getSubTree = (oid, session) => {
     });
 };
 exports.getSubTree = getSubTree;
-// router.get("/:oid", async (req: Request, res: Response) => {
-//   try {
-//     const session = snmp.createSession(
-//       process.env.TRAGET_HOST || "", // ค่าของ SNMP_HOST
-//       process.env.COMMUNITY_HOST || "" // ค่าของ SNMP_COMMUNITY
-//     );
-//     const data = await getOne([req.params.oid.toString()], session);
-//     res.json(data);
-//   } catch (error) {
-//     console.error("Error fetching SNMP data:", error);
-//     res.status(500).json({ error: "Internal Server Error", details: error });
-//   }
-// });
-// router.get("/sub/:oid", async (req: Request, res: Response) => {
-//   try {
-//     const session = snmp.createSession(
-//       process.env.TRAGET_HOST || "", // ค่าของ SNMP_HOST
-//       process.env.COMMUNITY_HOST || "" // ค่าของ SNMP_COMMUNITY
-//     );
-//     getSubTree(req.params.oid.toString(), session)
-//       .then((data) => {
-//         res.json(data);
-//       })
-//       .catch((error) => {
-//         res.json(`"Error retrieving SNMP data:" ${error}`);
-//       });
-//   } catch (error) {
-//     console.error("Error fetching users:", error);
-//     res.status(500).json({ error: "Internal Server Error", details: error });
-//   }
-// });
+const createSnmpSession = (host, community) => {
+    return snmp.createSession(host, community);
+};
+exports.createSnmpSession = createSnmpSession;

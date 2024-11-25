@@ -8,15 +8,25 @@ import Interface from "./routes/Interfaceapi";
 import Alert from "./routes/Alertapi";
 import deviceRoutes from "./routes/Deviceapi";
 import Host from "./routes/Host";
-// import Template from "./routes/Template";
-// import Item from "./routes/Item";
-// import History from "./routes/History";
+import Template from "./routes/Template";
+import Item from "./routes/Item";
+import History from "./routes/History";
 // import Details from "./routes/Details";
+import { errorHandler } from "./middlewares/errorMiddleware";
+import { connectDb } from "./services/database";
+import { fetchAndStoreSnmpData } from "./services/snmpService";
 
 const app: Express = express();
 
 async function start() {
   try {
+    connectDb().catch((error) => {
+      console.error(
+        "Failed to start app due to database connection error",
+        error
+      );
+    });
+
     dotenv.config();
 
     app.use(cors());
@@ -36,14 +46,26 @@ async function start() {
     app.use("/getAlert", Alert);
     // app.use("/getDetails", Details);
     app.use("/host", Host);
-    // app.use("/template", Template);
-    // app.use("/item", Item);
-    // app.use("/history", History);
+    app.use("/template", Template);
+    app.use("/item", Item);
+    app.use("/history", History);
+
+    setInterval(async () => {
+      try {
+        console.log("Fetching and storing SNMP data...");
+        const results = await fetchAndStoreSnmpData();
+        console.log("SNMP data stored:", results.length, "entries.");
+      } catch (error) {
+        console.error("Error in scheduled SNMP data fetching:", error);
+      }
+    }, 10000);
 
     app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
       console.error("Unhandled error:", err);
       res.status(500).json({ error: "Something went wrong!" });
     });
+
+    app.use(errorHandler);
   } catch (err) {
     console.error(err);
   }

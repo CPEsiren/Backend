@@ -1,5 +1,7 @@
+import { body, validationResult } from "express-validator";
 import { Router, Request, Response } from "express";
-import { MongoClient } from "mongodb";
+import { getDb } from "../services/database";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 
 const router = Router();
@@ -10,8 +12,7 @@ const client = new MongoClient(`${process.env.Database_url}` || "");
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    await client.connect();
-    const db = client.db("CPE-siren");
+    const db = getDb();
     const collection = db.collection("Items");
 
     const data = await collection.find().toArray();
@@ -26,71 +27,52 @@ router.get("/", async (req: Request, res: Response) => {
       error: "Failed to fetch data.",
       details: err instanceof Error ? err.message : "Unknown error",
     });
-  } finally {
-    // ปิดการเชื่อมต่อ
-    await client.close();
   }
 });
 
-router.post("/createItem", async (req: Request, res: Response) => {
-  try {
-    const {
-      item_id,
-      host_id,
-      name_item,
-      oid,
-      type,
-      unit,
-      interval,
-      exp_history,
-      exp_trends,
-    } = req.body;
+router.post(
+  "/createItem",
+  [
+    body("host_id").notEmpty().withMessage("Host id is required"),
+    body("name_item").notEmpty().withMessage("Name item is required"),
+    body("oid").notEmpty().withMessage("OID is required"),
+    body("type").notEmpty().withMessage("Item type is required"),
+    body("unit").notEmpty().withMessage("Item unit is required"),
+    body("interval").notEmpty().withMessage("interval is required"),
+    body("exp_history").notEmpty().withMessage("exp_history is required"),
+    body("exp_trends").notEmpty().withMessage("exp_trends is required"),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const data = req.body;
 
-    if (
-      !item_id ||
-      !host_id ||
-      !name_item ||
-      !oid ||
-      !type ||
-      !unit ||
-      !interval ||
-      !exp_history ||
-      !exp_trends
-    ) {
-      return res.status(400).json({ error: "Missing required fields." });
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const db = getDb();
+      const collection = db.collection("Items");
+
+      const result = await collection.insertOne({
+        ...data,
+        host_id: new ObjectId(data.host_id),
+      });
+
+      res.status(201).json({
+        message: "Data added successfully.",
+        data: result,
+      });
+    } catch (err) {
+      console.error("Error fetching data:", err);
+
+      res.status(500).json({
+        error: "Failed to fetch data.",
+        details: err instanceof Error ? err.message : "Unknown error",
+      });
     }
-
-    await client.connect();
-    const db = client.db("CPE-siren");
-    const collection = db.collection("Items");
-
-    const result = await collection.insertOne({
-      _id: item_id,
-      host_id,
-      name_item,
-      oid,
-      type,
-      unit,
-      interval,
-      exp_history,
-      exp_trends,
-    });
-
-    res.status(201).json({
-      message: "Data added successfully.",
-      data: result,
-    });
-  } catch (err) {
-    console.error("Error fetching data:", err);
-
-    res.status(500).json({
-      error: "Failed to fetch data.",
-      details: err instanceof Error ? err.message : "Unknown error",
-    });
-  } finally {
-    await client.close();
   }
-});
+);
 
 router.delete("/deleteItem/:id", async (req: Request, res: Response) => {
   try {
@@ -100,8 +82,7 @@ router.delete("/deleteItem/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing required parameter: id" });
     }
 
-    await client.connect();
-    const db = client.db("CPE-siren");
+    const db = getDb();
     const collection = db.collection("Items");
 
     const result = await collection.deleteOne({ _id: parseInt(id) as any });
@@ -122,8 +103,6 @@ router.delete("/deleteItem/:id", async (req: Request, res: Response) => {
       error: "Failed to delete data.",
       details: err instanceof Error ? err.message : "Unknown error",
     });
-  } finally {
-    await client.close();
   }
 });
 

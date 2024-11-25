@@ -12,7 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const express_validator_1 = require("express-validator");
 const express_1 = require("express");
+const database_1 = require("../services/database");
 const mongodb_1 = require("mongodb");
 const dotenv_1 = __importDefault(require("dotenv"));
 const router = (0, express_1.Router)();
@@ -20,8 +22,7 @@ dotenv_1.default.config();
 const client = new mongodb_1.MongoClient(`${process.env.Database_url}` || "");
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Items");
         const data = yield collection.find().toArray();
         res.status(200).json({
@@ -36,39 +37,26 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        // ปิดการเชื่อมต่อ
-        yield client.close();
-    }
 }));
-router.post("/createItem", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/createItem", [
+    (0, express_validator_1.body)("host_id").notEmpty().withMessage("Host id is required"),
+    (0, express_validator_1.body)("name_item").notEmpty().withMessage("Name item is required"),
+    (0, express_validator_1.body)("oid").notEmpty().withMessage("OID is required"),
+    (0, express_validator_1.body)("type").notEmpty().withMessage("Item type is required"),
+    (0, express_validator_1.body)("unit").notEmpty().withMessage("Item unit is required"),
+    (0, express_validator_1.body)("interval").notEmpty().withMessage("interval is required"),
+    (0, express_validator_1.body)("exp_history").notEmpty().withMessage("exp_history is required"),
+    (0, express_validator_1.body)("exp_trends").notEmpty().withMessage("exp_trends is required"),
+], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { item_id, host_id, name_item, oid, type, unit, interval, exp_history, exp_trends, } = req.body;
-        if (!item_id ||
-            !host_id ||
-            !name_item ||
-            !oid ||
-            !type ||
-            !unit ||
-            !interval ||
-            !exp_history ||
-            !exp_trends) {
-            return res.status(400).json({ error: "Missing required fields." });
+        const data = req.body;
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Items");
-        const result = yield collection.insertOne({
-            _id: item_id,
-            host_id,
-            name_item,
-            oid,
-            type,
-            unit,
-            interval,
-            exp_history,
-            exp_trends,
-        });
+        const result = yield collection.insertOne(Object.assign(Object.assign({}, data), { host_id: new mongodb_1.ObjectId(data.host_id) }));
         res.status(201).json({
             message: "Data added successfully.",
             data: result,
@@ -81,9 +69,6 @@ router.post("/createItem", (req, res) => __awaiter(void 0, void 0, void 0, funct
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        yield client.close();
-    }
 }));
 router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -91,8 +76,7 @@ router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0,
         if (!id) {
             return res.status(400).json({ error: "Missing required parameter: id" });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Items");
         const result = yield collection.deleteOne({ _id: parseInt(id) });
         if (result.deletedCount === 0) {
@@ -110,9 +94,6 @@ router.delete("/deleteItem/:id", (req, res) => __awaiter(void 0, void 0, void 0,
             error: "Failed to delete data.",
             details: err instanceof Error ? err.message : "Unknown error",
         });
-    }
-    finally {
-        yield client.close();
     }
 }));
 exports.default = router;

@@ -12,7 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const express_validator_1 = require("express-validator");
 const express_1 = require("express");
+const database_1 = require("../services/database");
 const mongodb_1 = require("mongodb");
 const dotenv_1 = __importDefault(require("dotenv"));
 const router = (0, express_1.Router)();
@@ -20,8 +22,7 @@ dotenv_1.default.config();
 const client = new mongodb_1.MongoClient(`${process.env.Database_url}` || "");
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Templates");
         const data = yield collection.find().toArray();
         res.status(200).json({
@@ -36,31 +37,21 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        // ปิดการเชื่อมต่อ
-        yield client.close();
-    }
 }));
-router.post("/createTemplate", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/createTemplate", [(0, express_validator_1.body)("name_template").notEmpty().withMessage("Name template is required")], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { template_id, name_template, description } = req.body;
-        if (!template_id || !name_template || !description) {
-            return res.status(400).json({ error: "Missing required fields." });
+        const data = req.body;
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Templates");
-        const result = yield collection.insertOne({
-            _id: template_id,
-            name_template,
-            description,
-            createdAt: new Date().toLocaleString("th-TH", {
+        const result = yield collection.insertOne(Object.assign(Object.assign({}, data), { createdAt: new Date().toLocaleString("th-TH", {
                 timeZone: "Asia/Bangkok",
-            }),
-            updatedAt: new Date().toLocaleString("th-TH", {
+            }), updatedAt: new Date().toLocaleString("th-TH", {
                 timeZone: "Asia/Bangkok",
-            }),
-        });
+            }) }));
         res.status(201).json({
             message: "Data added successfully.",
             data: result,
@@ -73,9 +64,6 @@ router.post("/createTemplate", (req, res) => __awaiter(void 0, void 0, void 0, f
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        yield client.close();
-    }
 }));
 router.delete("/deleteTemplate/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -83,8 +71,7 @@ router.delete("/deleteTemplate/:id", (req, res) => __awaiter(void 0, void 0, voi
         if (!id) {
             return res.status(400).json({ error: "Missing required parameter: id" });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Templates");
         const result = yield collection.deleteOne({ _id: parseInt(id) });
         if (result.deletedCount === 0) {
@@ -102,9 +89,6 @@ router.delete("/deleteTemplate/:id", (req, res) => __awaiter(void 0, void 0, voi
             error: "Failed to delete data.",
             details: err instanceof Error ? err.message : "Unknown error",
         });
-    }
-    finally {
-        yield client.close();
     }
 }));
 exports.default = router;

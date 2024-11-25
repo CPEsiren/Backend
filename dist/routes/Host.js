@@ -12,7 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const express_validator_1 = require("express-validator");
 const express_1 = require("express");
+const database_1 = require("../services/database");
 const mongodb_1 = require("mongodb");
 const dotenv_1 = __importDefault(require("dotenv"));
 const router = (0, express_1.Router)();
@@ -20,8 +22,7 @@ dotenv_1.default.config();
 const client = new mongodb_1.MongoClient(`${process.env.Database_url}` || "");
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Hosts");
         const data = yield collection.find().toArray();
         res.status(200).json({
@@ -36,35 +37,25 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        // ปิดการเชื่อมต่อ
-        yield client.close();
-    }
 }));
-router.post("/createHost", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/createHost", [
+    (0, express_validator_1.body)("hostname").notEmpty().withMessage("Hostname is required"),
+    (0, express_validator_1.body)("ip_address").isIP().withMessage("Invalid IP address"),
+    (0, express_validator_1.body)("snmp_port").notEmpty().withMessage("SNMP port is required"),
+    (0, express_validator_1.body)("snmp_version").notEmpty().withMessage("SNMP version is required"),
+    (0, express_validator_1.body)("snmp_community").notEmpty().withMessage("SNMP community is required"),
+    (0, express_validator_1.body)("hostgroup").notEmpty().withMessage("Hostgroup is required"),
+    (0, express_validator_1.body)("templates").notEmpty().withMessage("Templates is required"),
+], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const data = req.body;
-        const reqFields = [
-            "hostname",
-            "ip_address",
-            "snmp_port",
-            "snmp_version",
-            "snmp_community",
-            "hostgroup",
-            "status",
-            "templates",
-        ];
-        for (const field of reqFields) {
-            if (!data[field]) {
-                return res
-                    .status(400)
-                    .json({ error: `Missing required field: ${field}` });
-            }
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Hosts");
-        const result = yield collection.insertOne(Object.assign(Object.assign({}, data), { createdAt: new Date().toLocaleString("th-TH", {
+        const result = yield collection.insertOne(Object.assign(Object.assign({}, data), { status: 0, createdAt: new Date().toLocaleString("th-TH", {
                 timeZone: "Asia/Bangkok",
             }) }));
         res.status(201).json({
@@ -79,9 +70,6 @@ router.post("/createHost", (req, res) => __awaiter(void 0, void 0, void 0, funct
             details: err instanceof Error ? err.message : "Unknown error",
         });
     }
-    finally {
-        yield client.close();
-    }
 }));
 router.delete("/deleteHost/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -89,8 +77,7 @@ router.delete("/deleteHost/:id", (req, res) => __awaiter(void 0, void 0, void 0,
         if (!id) {
             return res.status(400).json({ error: "Missing required parameter: id" });
         }
-        yield client.connect();
-        const db = client.db("CPE-siren");
+        const db = (0, database_1.getDb)();
         const collection = db.collection("Hosts");
         const result = yield collection.deleteOne({ _id: parseInt(id) });
         if (result.deletedCount === 0) {
@@ -108,9 +95,6 @@ router.delete("/deleteHost/:id", (req, res) => __awaiter(void 0, void 0, void 0,
             error: "Failed to delete data.",
             details: err instanceof Error ? err.message : "Unknown error",
         });
-    }
-    finally {
-        yield client.close();
     }
 }));
 exports.default = router;
