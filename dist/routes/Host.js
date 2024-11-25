@@ -43,35 +43,30 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 }));
 router.post("/createHost", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { host_id, hostname, ip_address, snmp_port, snmp_version, snmp_community, hostgroup, status, templates, } = req.body;
-        if (!host_id ||
-            !hostname ||
-            !ip_address ||
-            !snmp_version ||
-            !snmp_community ||
-            !hostgroup ||
-            !status ||
-            !templates ||
-            !snmp_port) {
-            return res.status(400).json({ error: "Missing required fields." });
+        const data = req.body;
+        const reqFields = [
+            "hostname",
+            "ip_address",
+            "snmp_port",
+            "snmp_version",
+            "snmp_community",
+            "hostgroup",
+            "status",
+            "templates",
+        ];
+        for (const field of reqFields) {
+            if (!data[field]) {
+                return res
+                    .status(400)
+                    .json({ error: `Missing required field: ${field}` });
+            }
         }
         yield client.connect();
         const db = client.db("CPE-siren");
         const collection = db.collection("Hosts");
-        const result = yield collection.insertOne({
-            _id: host_id,
-            hostname,
-            ip_address,
-            snmp_port,
-            snmp_version,
-            snmp_community,
-            hostgroup,
-            status,
-            templates,
-            createdAt: new Date().toLocaleString("th-TH", {
+        const result = yield collection.insertOne(Object.assign(Object.assign({}, data), { createdAt: new Date().toLocaleString("th-TH", {
                 timeZone: "Asia/Bangkok",
-            }),
-        });
+            }) }));
         res.status(201).json({
             message: "Data added successfully.",
             data: result,

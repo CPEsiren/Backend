@@ -34,30 +34,25 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post("/createHost", async (req: Request, res: Response) => {
   try {
-    const {
-      host_id,
-      hostname,
-      ip_address,
-      snmp_port,
-      snmp_version,
-      snmp_community,
-      hostgroup,
-      status,
-      templates,
-    } = req.body;
+    const data = req.body;
 
-    if (
-      !host_id ||
-      !hostname ||
-      !ip_address ||
-      !snmp_version ||
-      !snmp_community ||
-      !hostgroup ||
-      !status ||
-      !templates ||
-      !snmp_port
-    ) {
-      return res.status(400).json({ error: "Missing required fields." });
+    const reqFields = [
+      "hostname",
+      "ip_address",
+      "snmp_port",
+      "snmp_version",
+      "snmp_community",
+      "hostgroup",
+      "status",
+      "templates",
+    ];
+
+    for (const field of reqFields) {
+      if (!data[field]) {
+        return res
+          .status(400)
+          .json({ error: `Missing required field: ${field}` });
+      }
     }
 
     await client.connect();
@@ -65,15 +60,7 @@ router.post("/createHost", async (req: Request, res: Response) => {
     const collection = db.collection("Hosts");
 
     const result = await collection.insertOne({
-      _id: host_id,
-      hostname,
-      ip_address,
-      snmp_port,
-      snmp_version,
-      snmp_community,
-      hostgroup,
-      status,
-      templates,
+      ...data,
       createdAt: new Date().toLocaleString("th-TH", {
         timeZone: "Asia/Bangkok",
       }),
