@@ -2,6 +2,8 @@ Install
 
 npm install
 
-npm install nodemon
+!!!!dont't forget to fill .env file
 
-npm install cors
+npm run build
+
+npm start
