@@ -4,39 +4,67 @@ import { ObjectId } from "mongodb";
 
 export async function fetchAndStoreSnmpData() {
   const db = getDb();
-  const collection = db.collection("Histories");
-  const hosts = await db.collection("Hosts").find().toArray();
+  const history_collection = db.collection("Histories");
+  const host_collection = db.collection("Hosts");
+  const item_collection = db.collection("Items");
+  const hosts = await host_collection.find().toArray();
 
   const results = [];
 
   for (const host of hosts) {
-    const session = createSnmpSession(host.ip_address, host.community);
+    const { session, isConnected } = await createSnmpSession(
+      host.ip_address,
+      host.community
+    );
 
-    const items = await db
-      .collection("Items")
+    if (!isConnected || !session) {
+      await host_collection.updateOne(
+        { _id: new ObjectId(host._id) },
+        { $set: { status: 0 } }
+      );
+      const err = `SNMP connection failed for host ${host._id} (IP: ${host.ip_address}, Community: ${host.community})`;
+      console.error(err);
+      continue;
+    }
+    await host_collection.updateOne(
+      { _id: new ObjectId(host._id) },
+      { $set: { status: 1 } }
+    );
+
+    const items = await item_collection
       .find({
         host_id: new ObjectId(host._id),
       })
       .toArray();
 
     for (const item of items) {
-      const snmpData = await getSnmpData(item.oid, session);
+      try {
+        const snmpData = await getSnmpData(item.oid, session);
 
-      const result = await collection.insertOne({
-        metadata: {
-          host_id: host._id,
-          item_id: item._id,
-          item_name: item.name_item,
-        },
-        timestamp: new Date(),
-        value: snmpData[0]?.value, // สมมติว่าค่าที่ดึงมาเป็นตัวแรก
-      });
+        await item_collection.updateOne(
+          { _id: new ObjectId(item._id) },
+          { $set: { status: 1 } }
+        );
 
-      results.push(result);
+        const result = await history_collection.insertOne({
+          metadata: {
+            host_id: host._id,
+            item_id: item._id,
+            item_name: item.name_item,
+          },
+          timestamp: new Date(),
+          value: snmpData[0]?.value,
+        });
+        results.push(result);
+      } catch {
+        await item_collection.updateOne(
+          { _id: new ObjectId(item._id) },
+          { $set: { status: 0 } }
+        );
+        const err = `No data returned for OID ${item.oid} on host ${host._id}`;
+        console.error(err);
+      }
     }
-
-    session.close();
   }
-
   return results;
 }

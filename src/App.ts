@@ -12,7 +12,6 @@ import Template from "./routes/Template";
 import Item from "./routes/Item";
 import History from "./routes/History";
 // import Details from "./routes/Details";
-import { errorHandler } from "./middlewares/errorMiddleware";
 import { connectDb } from "./services/database";
 import { fetchAndStoreSnmpData } from "./services/snmpService";
 
@@ -64,8 +63,6 @@ async function start() {
       console.error("Unhandled error:", err);
       res.status(500).json({ error: "Something went wrong!" });
     });
-
-    app.use(errorHandler);
   } catch (err) {
     console.error(err);
   }

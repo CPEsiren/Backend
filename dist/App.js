@@ -26,7 +26,6 @@ const Template_1 = __importDefault(require("./routes/Template"));
 const Item_1 = __importDefault(require("./routes/Item"));
 const History_1 = __importDefault(require("./routes/History"));
 // import Details from "./routes/Details";
-const errorMiddleware_1 = require("./middlewares/errorMiddleware");
 const database_1 = require("./services/database");
 const snmpService_1 = require("./services/snmpService");
 const app = (0, express_1.default)();
@@ -69,7 +68,6 @@ function start() {
                 console.error("Unhandled error:", err);
                 res.status(500).json({ error: "Something went wrong!" });
             });
-            app.use(errorMiddleware_1.errorHandler);
         }
         catch (err) {
             console.error(err);

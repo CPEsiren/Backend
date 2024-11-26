@@ -5,19 +5,49 @@ interface SnmpData {
   value: string;
 }
 
+// export const getSnmpData = (oid: string, session: any): Promise<SnmpData[]> => {
+//   return new Promise((resolve, reject) => {
+//     const snmpData: SnmpData[] = [];
+
+//     session.get([oid], (error: Error | null, varbinds: any[]) => {
+//       if (error) {
+//         session.close();
+//         return;
+//       } else {
+//         for (const varbind of varbinds) {
+//           if (snmp.isVarbindError(varbind)) {
+//             session.close();
+//             reject(snmp.varbindError(varbind));
+//             return;
+//           } else {
+//             snmpData.push({
+//               oid: varbind.oid,
+//               value: varbind.value.toString(),
+//             });
+//           }
+//         }
+//         resolve(snmpData);
+//       }
+//     });
+//   });
+// };
+
 export const getSnmpData = (oid: string, session: any): Promise<SnmpData[]> => {
   return new Promise((resolve, reject) => {
     const snmpData: SnmpData[] = [];
 
     session.get([oid], (error: Error | null, varbinds: any[]) => {
       if (error) {
+        // console.error(`Error fetching OID ${oid}:`, error.toString());
         session.close();
-        reject(error.toString());
+        reject(`Error fetching OID ${oid}: ${error.toString()}`);
       } else {
         for (const varbind of varbinds) {
           if (snmp.isVarbindError(varbind)) {
+            const varbindError = snmp.varbindError(varbind);
+            // console.error(`SNMP Varbind Error for OID ${oid}:`, varbindError);
             session.close();
-            reject(snmp.varbindError(varbind));
+            reject(`SNMP Varbind Error for OID ${oid}: ${varbindError}`);
             return;
           } else {
             snmpData.push({
@@ -26,6 +56,11 @@ export const getSnmpData = (oid: string, session: any): Promise<SnmpData[]> => {
             });
           }
         }
+
+        if (snmpData.length === 0) {
+          console.warn(`No data returned for OID ${oid}`);
+        }
+
         resolve(snmpData);
       }
     });
@@ -68,6 +103,31 @@ export const getSubTree = (oid: string, session: any) => {
   });
 };
 
-export const createSnmpSession = (host: string, community: string) => {
-  return snmp.createSession(host, community);
+export const createSnmpSession = async (
+  host: string,
+  community: string
+): Promise<{ session: any; isConnected: boolean }> => {
+  const session = snmp.createSession(host, community);
+
+  try {
+    // ทดสอบการเชื่อมต่อ SNMP ด้วย OID พื้นฐาน เช่น sysDescr.0
+    const testOid = "1.3.6.1.2.1.1.1.0"; // OID สำหรับข้อมูลคำอธิบายระบบ
+    const data = await new Promise((resolve, reject) => {
+      session.get([testOid], (error: any, varbinds: any) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(varbinds);
+        }
+      });
+    });
+
+    // ถ้าดึงข้อมูลสำเร็จและมีข้อมูลตอบกลับ แสดงว่าเชื่อมต่อได้
+    const isConnected = Array.isArray(data) && data.length > 0;
+
+    return { session, isConnected };
+  } catch {
+    session.close();
+    return { session: null, isConnected: false };
+  }
 };
