@@ -38,7 +38,10 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         });
     }
 }));
-router.post("/createTemplate", [(0, express_validator_1.body)("name_template").notEmpty().withMessage("Name template is required")], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post("/createTemplate", [
+    (0, express_validator_1.body)("name_template").notEmpty().withMessage("Name template is required"),
+    (0, express_validator_1.body)("items").isArray().withMessage("item is not array"),
+], (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const data = req.body;
         const errors = (0, express_validator_1.validationResult)(req);

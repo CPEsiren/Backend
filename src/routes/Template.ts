@@ -32,7 +32,10 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post(
   "/createTemplate",
-  [body("name_template").notEmpty().withMessage("Name template is required")],
+  [
+    body("name_template").notEmpty().withMessage("Name template is required"),
+    body("items").isArray().withMessage("item is not array"),
+  ],
   async (req: Request, res: Response) => {
     try {
       const data = req.body;
