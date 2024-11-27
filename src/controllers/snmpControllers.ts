@@ -5,33 +5,6 @@ interface SnmpData {
   value: string;
 }
 
-// export const getSnmpData = (oid: string, session: any): Promise<SnmpData[]> => {
-//   return new Promise((resolve, reject) => {
-//     const snmpData: SnmpData[] = [];
-
-//     session.get([oid], (error: Error | null, varbinds: any[]) => {
-//       if (error) {
-//         session.close();
-//         return;
-//       } else {
-//         for (const varbind of varbinds) {
-//           if (snmp.isVarbindError(varbind)) {
-//             session.close();
-//             reject(snmp.varbindError(varbind));
-//             return;
-//           } else {
-//             snmpData.push({
-//               oid: varbind.oid,
-//               value: varbind.value.toString(),
-//             });
-//           }
-//         }
-//         resolve(snmpData);
-//       }
-//     });
-//   });
-// };
-
 export const getSnmpData = (oid: string, session: any): Promise<SnmpData[]> => {
   return new Promise((resolve, reject) => {
     const snmpData: SnmpData[] = [];
@@ -105,9 +78,33 @@ export const getSubTree = (oid: string, session: any) => {
 
 export const createSnmpSession = async (
   host: string,
-  community: string
+  community: string,
+  port: number,
+  versions: string
 ): Promise<{ session: any; isConnected: boolean }> => {
-  const session = snmp.createSession(host, community);
+  let version: any;
+  switch (versions) {
+    case "v1": {
+      version = snmp.Version1;
+      break;
+    }
+    case "v2": {
+      version = snmp.Version2c;
+      break;
+    }
+    case "v2c": {
+      version = snmp.Version2c;
+      break;
+    }
+    case "v3": {
+      version = snmp.Version3;
+    }
+  }
+
+  const session = snmp.createSession(host, community, {
+    port: port,
+    version: version,
+  });
 
   try {
     // ทดสอบการเชื่อมต่อ SNMP ด้วย OID พื้นฐาน เช่น sysDescr.0

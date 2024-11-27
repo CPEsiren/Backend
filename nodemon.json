@@ -1,5 +1,6 @@
 {
-    "watch": ["src"],
-    "ext": "ts",
-    "exec": "concurrently \"npx tsc --watch\" \"ts-node src/index.ts\""
-  }
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": ["dist"],
+  "exec": "npm run build && node dist/index.js"
+}

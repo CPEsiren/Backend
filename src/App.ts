@@ -10,16 +10,16 @@ const app: Express = express();
 
 async function start() {
   try {
-    connectDb().catch((error) => {
-      console.error(
-        "Failed to start app due to database connection error",
-        error
-      );
-    });
+    try {
+      await connectDb();
+    } catch (err) {
+      console.error("Failed to start the application:", err);
+    }
 
     dotenv.config();
 
     app.use(cors());
+
     app.use(bodyParser.json());
 
     app.use((req: Request, res: Response, next: NextFunction) => {

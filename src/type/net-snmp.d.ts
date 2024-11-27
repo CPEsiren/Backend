@@ -1,4 +1,4 @@
 declare module "net-snmp" {
-  var snmp: any;
-  export = snmp;
+  const netSnmp: any; // คุณสามารถปรับเป็นชนิดข้อมูลที่ถูกต้องภายหลัง
+  export = netSnmp;
 }
