@@ -113,16 +113,28 @@ export const deleteHost = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await Host.deleteOne({
-      _id: new ObjectId(host_id.toString()),
-    });
+    const host = await Host.findById(host_id);
 
-    if (result.deletedCount === 0) {
+    if (!host) {
       return res.status(404).json({
         status: "fail",
         message: `No host found with ID: ${host_id}.`,
       });
     }
+
+    const itemIds = host.items;
+
+    const result = await Host.deleteOne({ _id: host_id });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: `Failed to delete host with ID: ${host_id}.`,
+      });
+    }
+
+    await Item.deleteMany({ _id: { $in: itemIds } });
+
     res.status(200).json({
       status: "success",
       message: `Host with ID: ${host_id} deleted successfully.`,
