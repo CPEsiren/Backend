@@ -1,11 +1,11 @@
 import Host from "../models/Host";
+import Item from "../models/Item";
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
     const hosts = await Host.find();
-    console.log(hosts);
 
     if (hosts.length === 0) {
       return res.status(404).json({
@@ -38,6 +38,7 @@ export const createHost = async (req: Request, res: Response) => {
       hostgroup,
       templates,
       details,
+      items,
     } = req.body;
 
     if (
@@ -74,6 +75,19 @@ export const createHost = async (req: Request, res: Response) => {
     });
     await newHost.save();
 
+    if (Array.isArray(items) && items.length > 0) {
+      const itemDocument = items.map((item) => ({
+        ...item,
+        host_id: newHost._id,
+      }));
+
+      const insertedItems = await Item.insertMany(itemDocument);
+      const itemIds = insertedItems.map((item) => item._id);
+
+      newHost.items = itemIds;
+
+      await newHost.save();
+    }
     res.status(201).json({
       status: "success",
       message: "Host created successfully.",
