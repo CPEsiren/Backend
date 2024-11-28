@@ -1,13 +1,13 @@
 // src/routes.ts
 import express from "express";
 import Host from "./Host_api";
-// import Template from "./Template";
+import Template from "./Template_api";
 import Item from "./Item_api";
 import Data from "./Data_api";
 
 export const routes = express.Router();
 
 routes.use("/host", Host);
-// routes.use("/template", Template);
+routes.use("/template", Template);
 routes.use("/item", Item);
 routes.use("/data", Data);

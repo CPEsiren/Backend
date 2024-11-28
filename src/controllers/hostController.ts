@@ -37,6 +37,7 @@ export const createHost = async (req: Request, res: Response) => {
       snmp_community,
       hostgroup,
       templates,
+      details,
     } = req.body;
 
     if (
@@ -69,6 +70,7 @@ export const createHost = async (req: Request, res: Response) => {
       snmp_community,
       hostgroup,
       templates,
+      details,
     });
     await newHost.save();
 

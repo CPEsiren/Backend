@@ -29,15 +29,15 @@ async function start() {
 
     app.use("/", routes);
 
-    setInterval(async () => {
-      try {
-        console.log("Fetching and storing SNMP data...");
-        const results = await fetchAndStoreSnmpData();
-        console.log("SNMP data stored:", results.length, "entries.");
-      } catch (error) {
-        console.error("Error in scheduled SNMP data fetching:", error);
-      }
-    }, 10000);
+    // setInterval(async () => {
+    //   try {
+    //     console.log("Fetching and storing SNMP data...");
+    //     const results = await fetchAndStoreSnmpData();
+    //     console.log("SNMP data stored:", results.length, "entries.");
+    //   } catch (error) {
+    //     console.error("Error in scheduled SNMP data fetching:", error);
+    //   }
+    // }, 10000);
   } catch (err) {
     console.error(err);
   }
