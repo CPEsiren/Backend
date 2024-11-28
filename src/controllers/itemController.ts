@@ -84,6 +84,9 @@ export const deleteItem = async (req: Request, res: Response) => {
         message: `No host found with ID: ${item_id}.`,
       });
     }
+
+    await Host.updateMany({ items: item_id }, { $pull: { items: item_id } });
+
     res.status(200).json({
       status: "success",
       message: `Item with ID: ${item_id} deleted successfully.`,
