@@ -80,51 +80,37 @@ export const createSnmpSession = async (
   host: string,
   community: string,
   port: number,
-  versions: string
+  version: string
 ): Promise<{ session: any; isConnected: boolean }> => {
-  let version: any;
-  switch (versions) {
-    case "v1": {
-      version = snmp.Version1;
-      break;
-    }
-    case "v2": {
-      version = snmp.Version2c;
-      break;
-    }
-    case "v2c": {
-      version = snmp.Version2c;
-      break;
-    }
-    case "v3": {
-      version = snmp.Version3;
-    }
-  }
+  const SNMP_VERSIONS: Record<string, any> = {
+    v1: snmp.Version1,
+    v2: snmp.Version2c,
+    v2c: snmp.Version2c,
+    v3: snmp.Version3,
+  };
 
-  const session = snmp.createSession(host, community, {
-    port: port,
-    version: version,
-  });
+  const snmpVersion = SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
+  const testOid = "1.3.6.1.2.1.1.1.0"; // OID สำหรับข้อมูลคำอธิบายระบบ
 
   try {
-    // ทดสอบการเชื่อมต่อ SNMP ด้วย OID พื้นฐาน เช่น sysDescr.0
-    const testOid = "1.3.6.1.2.1.1.1.0"; // OID สำหรับข้อมูลคำอธิบายระบบ
-    const data = await new Promise((resolve, reject) => {
+    const session = snmp.createSession(host, community, {
+      port: port,
+      version: snmpVersion,
+    });
+
+    return new Promise((resolve, reject) => {
       session.get([testOid], (error: any, varbinds: any) => {
         if (error) {
-          reject(error);
+          session.close();
+          resolve({ session: null, isConnected: false });
         } else {
-          resolve(varbinds);
+          const isConnected = Array.isArray(varbinds) && varbinds.length > 0;
+          resolve({ session, isConnected });
         }
       });
     });
-
-    // ถ้าดึงข้อมูลสำเร็จและมีข้อมูลตอบกลับ แสดงว่าเชื่อมต่อได้
-    const isConnected = Array.isArray(data) && data.length > 0;
-
-    return { session, isConnected };
-  } catch {
-    session.close();
+  } catch (error) {
+    console.error(`SNMP Session Creation Error: ${error}`);
     return { session: null, isConnected: false };
   }
 };
