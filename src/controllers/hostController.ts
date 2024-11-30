@@ -41,28 +41,26 @@ export const createHost = async (req: Request, res: Response) => {
       items,
     } = req.body;
 
-    if (
-      !hostname ||
-      !ip_address ||
-      !snmp_port ||
-      !snmp_version ||
-      !snmp_community ||
-      !hostgroup
-    ) {
+    // Check for required fields
+    const requiredFields = [
+      "hostname",
+      "ip_address",
+      "snmp_port",
+      "snmp_version",
+      "snmp_community",
+      "hostgroup",
+    ];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: [
-          "hostname",
-          "ip_address",
-          "snmp_port",
-          "snmp_version",
-          "snmp_community",
-          "hostgroup",
-        ],
+        requiredFields: missingFields,
       });
     }
 
+    // Create new host
     const newHost = new Host({
       hostname,
       ip_address,
@@ -73,21 +71,25 @@ export const createHost = async (req: Request, res: Response) => {
       templates,
       details,
     });
-    await newHost.save();
 
-    if (Array.isArray(items) && items.length > 0) {
-      const itemDocument = items.map((item) => ({
-        ...item,
-        host_id: newHost._id,
-      }));
+    // Save host and create items in a single transaction
+    const session = await Host.startSession();
+    await session.withTransaction(async () => {
+      await newHost.save({ session });
 
-      const insertedItems = await Item.insertMany(itemDocument);
-      const itemIds = insertedItems.map((item) => item._id);
+      if (Array.isArray(items) && items.length > 0) {
+        const itemDocuments = items.map((item) => ({
+          ...item,
+          host_id: newHost._id,
+        }));
 
-      newHost.items = itemIds;
+        const insertedItems = await Item.insertMany(itemDocuments, { session });
+        newHost.items = insertedItems.map((item) => item._id);
+        await newHost.save({ session });
+      }
+    });
+    session.endSession();
 
-      await newHost.save();
-    }
     res.status(201).json({
       status: "success",
       message: "Host created successfully.",
@@ -104,40 +106,38 @@ export const createHost = async (req: Request, res: Response) => {
 
 export const deleteHost = async (req: Request, res: Response) => {
   try {
-    const host_id = req.query.id;
+    const host_id = req.query.id as string;
 
-    if (!host_id) {
+    // Validate host_id
+    if (!host_id || !ObjectId.isValid(host_id)) {
       return res.status(400).json({
         status: "fail",
-        message: "Host ID is required to delete a host.",
+        message: "Valid host ID is required to delete a host.",
       });
     }
 
-    const host = await Host.findById(host_id);
+    // Use findOneAndDelete to get the host and delete it in one operation
+    const deletedHost = await Host.findOneAndDelete({ _id: host_id });
 
-    if (!host) {
+    if (!deletedHost) {
       return res.status(404).json({
         status: "fail",
         message: `No host found with ID: ${host_id}.`,
       });
     }
 
-    const itemIds = host.items;
-
-    const result = await Host.deleteOne({ _id: host_id });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({
-        status: "fail",
-        message: `Failed to delete host with ID: ${host_id}.`,
-      });
+    // Delete associated items
+    if (
+      deletedHost.items &&
+      Array.isArray(deletedHost.items) &&
+      deletedHost.items.length > 0
+    ) {
+      await Item.deleteMany({ _id: { $in: deletedHost.items } });
     }
-
-    await Item.deleteMany({ _id: { $in: itemIds } });
 
     res.status(200).json({
       status: "success",
-      message: `Host with ID: ${host_id} deleted successfully.`,
+      message: `Host with ID: ${host_id} and its associated items deleted successfully.`,
     });
   } catch (err) {
     res.status(500).json({
