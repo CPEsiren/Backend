@@ -1,11 +1,14 @@
+import mongoose from "mongoose";
 import Data from "../models/Data";
+import Host from "../models/Host";
+import Item from "../models/Item";
 import { Request, Response } from "express";
 
 export const getAllData = async (req: Request, res: Response) => {
   try {
-    const data = await Data.find();
+    const data = await Data.find().lean().exec();
 
-    if (data.length === 0) {
+    if (!data.length) {
       return res.status(404).json({
         status: "fail",
         message: "No data found.",
@@ -26,6 +29,9 @@ export const getAllData = async (req: Request, res: Response) => {
 };
 
 export const createData = async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { value, timestamp, host_id, item_id } = req.body;
 
@@ -33,29 +39,52 @@ export const createData = async (req: Request, res: Response) => {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: [
-          "value",
-          "timestamp",
-          "host_id",
-          "hostname",
-          "item_id",
-          "item_name",
-        ],
+        requiredFields: ["value", "timestamp", "host_id", "item_id"],
       });
+    }
+
+    const [host, item] = await Promise.all([
+      Host.findById(host_id).session(session),
+      Item.findById(item_id).session(session),
+    ]);
+
+    if (!host || !item) {
+      throw new Error(host ? "Item not found" : "Host not found");
     }
 
     const newData = new Data({
       value,
       timestamp,
-      metadata: { host_id, item_id },
+      metadata: {
+        host_id,
+        item_id,
+      },
     });
-    await newData.save();
+
+    await newData.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(201).json({
       status: "success",
       message: "Data created successfully.",
       data: newData,
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    if (
+      error instanceof Error &&
+      (error.message === "Host not found" || error.message === "Item not found")
+    ) {
+      return res.status(404).json({
+        status: "fail",
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       status: "error",
       message: "Error creating data.",

@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
 import Template from "../models/Template";
+import mongoose from "mongoose";
 
 export const getAllTemplate = async (req: Request, res: Response) => {
   try {
-    const template = await Template.find();
+    const template = await Template.find().lean().exec();
 
-    if (template.length === 0) {
+    if (!template.length) {
       return res.status(404).json({
         status: "fail",
         message: "No template found.",
@@ -26,8 +27,11 @@ export const getAllTemplate = async (req: Request, res: Response) => {
 };
 
 export const createTemplate = async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { name_template, description } = req.body;
+    const { name_template, items, description } = req.body;
 
     if (!name_template || !description) {
       return res.status(400).json({
@@ -39,9 +43,14 @@ export const createTemplate = async (req: Request, res: Response) => {
 
     const newTemplate = new Template({
       name_template,
+      items,
       description,
     });
-    await newTemplate.save();
+
+    await newTemplate.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({
       status: "success",
@@ -49,6 +58,7 @@ export const createTemplate = async (req: Request, res: Response) => {
       data: newTemplate,
     });
   } catch (error) {
+    await session.abortTransaction();
     res.status(500).json({
       status: "error",
       message: "Error creating template.",
@@ -58,33 +68,45 @@ export const createTemplate = async (req: Request, res: Response) => {
 };
 
 export const deleteTemplate = async (req: Request, res: Response) => {
-  try {
-    const template_id = req.query.id;
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    if (!template_id) {
+  try {
+    const templateId = req.query.id as string;
+
+    if (!templateId || !mongoose.Types.ObjectId.isValid(templateId)) {
       return res.status(400).json({
         status: "fail",
-        message: "Template ID is required to delete a host.",
+        message: "Valid template ID is required.",
       });
     }
 
-    const result = await Template.deleteOne({ _id: template_id });
+    const deletedTemplate = await Template.findByIdAndDelete(
+      templateId
+    ).session(session);
 
-    if (result.deletedCount === 0) {
+    if (!deletedTemplate) {
+      await session.abortTransaction();
       return res.status(404).json({
         status: "fail",
-        message: `No host found with ID: ${template_id}.`,
+        message: "Template not found.",
       });
     }
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({
       status: "success",
-      message: `Template with ID: ${template_id} deleted successfully.`,
+      message: "Template deleted successfully.",
+      data: deletedTemplate,
     });
-  } catch (err) {
+  } catch (error) {
+    await session.abortTransaction();
     res.status(500).json({
       status: "error",
-      message: "Failed to delete template.",
-      error: err instanceof Error ? err.message : "Unknown error",
+      message: "Error deleting template.",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };

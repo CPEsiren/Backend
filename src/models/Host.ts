@@ -7,7 +7,7 @@ const hostSchema: Schema = new mongoose.Schema({
   snmp_version: { type: String, default: "v2c" },
   snmp_community: { type: String, required: true },
   hostgroup: { type: String },
-  template: { type: String },
+  template_name: { type: String },
   status: { type: Number, default: 0 },
   details: { type: Object },
   items: [

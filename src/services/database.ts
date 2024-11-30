@@ -1,12 +1,15 @@
-import { MongoClient } from "mongodb";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const url = process.env.Database_url || "";
+const url = process.env.DATABASE_URL;
 
-export const connectDb = async () => {
+export const connectDb = async (): Promise<void> => {
+  if (!url) {
+    throw new Error("DATABASE_URL is not defined in the environment variables");
+  }
+
   try {
     await mongoose.connect(url);
     console.log("MongoDB connected successfully.");
