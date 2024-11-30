@@ -19,6 +19,7 @@ router.post("/", createData);
 router.get("/fetch", async (req: Request, res: Response) => {
   try {
     const results = await fetchAndStoreSnmpData();
+
     res.status(200).json({
       status: "success",
       message: "SNMP data fetched and stored successfully.",
@@ -27,14 +28,19 @@ router.get("/fetch", async (req: Request, res: Response) => {
         records: results,
       },
     });
-  } catch (err: any) {
-    console.error("Error fetching and storing SNMP data:", err);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error("Error fetching and storing SNMP data:", errorMessage);
+
     res.status(500).json({
       status: "error",
       message: "Failed to fetch and store SNMP data.",
       error: {
-        message: err instanceof Error ? err.message : "Unknown error",
-        stack: process.env.NODE_ENV === "development" ? err.stack : undefined, // แสดง stack เฉพาะใน development
+        message: errorMessage,
+        ...(process.env.NODE_ENV === "development" && {
+          stack: (error as Error).stack,
+        }),
       },
     });
   }
