@@ -6,22 +6,17 @@ import bodyParser from "body-parser";
 import { routes } from "./apis";
 import dotenv from "dotenv";
 import cors from "cors";
+
 const app: Express = express();
 
 async function start() {
   try {
-    try {
-      await connectDb();
-    } catch (err) {
-      console.error("Failed to start the application:", err);
-    }
-
     dotenv.config();
 
+    await connectDb();
+
     app.use(cors());
-
     app.use(bodyParser.json());
-
     app.use((req: Request, res: Response, next: NextFunction) => {
       console.log(`${req.method} ${req.url}`);
       next();
@@ -39,7 +34,8 @@ async function start() {
     //   }
     // }, 10000);
   } catch (err) {
-    console.error(err);
+    console.error("Failed to start the application:", err);
+    process.exit(1);
   }
 }
 
