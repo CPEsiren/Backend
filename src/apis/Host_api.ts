@@ -3,6 +3,7 @@ import {
   createHost,
   deleteHost,
   getAllHosts,
+  updateHost,
 } from "../controllers/hostController";
 
 const router = Router();
@@ -10,6 +11,8 @@ const router = Router();
 router.get("/", getAllHosts);
 
 router.post("/", createHost);
+
+router.post("/edit", updateHost);
 
 router.delete("/", deleteHost);
 
