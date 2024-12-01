@@ -11,6 +11,6 @@ router.get("/", getAllTemplate);
 
 router.post("/", createTemplate);
 
-router.delete("/", deleteTemplate);
+router.delete("/:id", deleteTemplate);
 
 export default router;

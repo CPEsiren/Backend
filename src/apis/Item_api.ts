@@ -11,6 +11,6 @@ router.get("/", getAllItem);
 
 router.post("/", createItem);
 
-router.delete("/", deleteItem);
+router.delete("/:id", deleteItem);
 
 export default router;

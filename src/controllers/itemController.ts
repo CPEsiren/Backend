@@ -85,7 +85,7 @@ export const createItem = async (req: Request, res: Response) => {
 
 export const deleteItem = async (req: Request, res: Response) => {
   try {
-    const item_id = req.query.id;
+    const item_id = req.params.id;
 
     if (!item_id) {
       return res.status(400).json({

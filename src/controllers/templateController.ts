@@ -72,7 +72,7 @@ export const deleteTemplate = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const templateId = req.query.id as string;
+    const templateId = req.params.id;
 
     if (!templateId || !mongoose.Types.ObjectId.isValid(templateId)) {
       return res.status(400).json({
