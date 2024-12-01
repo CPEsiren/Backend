@@ -29,6 +29,40 @@ export const getAllHosts = async (req: Request, res: Response) => {
   }
 };
 
+export const getHostById = async (req: Request, res: Response) => {
+  try {
+    const host_id = req.params.id;
+
+    if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Valid host ID is required.",
+      });
+    }
+
+    const host = await Host.findById(host_id).lean().exec();
+
+    if (!host) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No host found with ID: ${host_id}`,
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Host fetched successfully.",
+      data: host,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "Error fetching host.",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
 export const createHost = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -113,7 +147,7 @@ export const deleteHost = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const host_id = req.query.id as string;
+    const host_id = req.params.id;
 
     if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
       return res.status(400).json({
@@ -169,7 +203,7 @@ export const updateHost = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const host_id = req.query.id as string;
+    const host_id = req.params.id;
 
     if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
       return res.status(400).json({
