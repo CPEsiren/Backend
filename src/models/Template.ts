@@ -5,7 +5,7 @@ const templateSchema = new mongoose.Schema({
   items: [
     {
       name_item: { type: String },
-      oit: { type: String },
+      oid: { type: String },
       type: { type: String },
       unit: { type: String },
     },
