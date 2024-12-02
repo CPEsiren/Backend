@@ -6,7 +6,45 @@ import { Request, Response } from "express";
 
 export const getAllData = async (req: Request, res: Response) => {
   try {
-    const data = await Data.find().lean().exec();
+    const data = await Data.aggregate([
+      {
+        $group: {
+          _id: {
+            host_id: "$metadata.host_id",
+            item_id: "$metadata.item_id",
+          },
+          data: {
+            $push: {
+              timestamp: "$timestamp",
+              value: "$value",
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.host_id",
+          items: {
+            $push: {
+              item_id: "$_id.item_id",
+              data: "$data",
+            },
+          },
+        },
+      },
+    ]);
+
+    await Data.populate(data, {
+      path: "items.item_id",
+      model: "Item",
+      select: "_id name_item oid type unit",
+    });
+
+    await Data.populate(data, {
+      path: "_id",
+      model: "Host",
+      select: "hostname",
+    });
 
     if (!data.length) {
       return res.status(404).json({
