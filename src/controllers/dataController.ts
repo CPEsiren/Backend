@@ -67,11 +67,11 @@ export const getAllData = async (req: Request, res: Response) => {
 };
 
 export const getData = async (req: Request, res: Response) => {
-  const item_id = req.params.id;
+  const host_id = req.params.id;
   try {
     const data = await Data.aggregate([
       {
-        $match: { "metadata.item_id": new mongoose.Types.ObjectId(item_id) },
+        $match: { "metadata.host_id": new mongoose.Types.ObjectId(host_id) },
       },
       {
         $group: {
