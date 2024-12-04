@@ -2,6 +2,7 @@ import Item from "../models/Item";
 import Host from "../models/Host";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
+import { clearSchedule, scheduleItem } from "../services/schedulerService";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -33,7 +34,7 @@ export const createItem = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const { host_id, name_item, oid, type, unit } = req.body;
+    const { host_id, name_item, oid, type, unit, interval } = req.body;
 
     if (!host_id || !name_item || !oid || !type || !unit) {
       return res.status(400).json({
@@ -43,8 +44,10 @@ export const createItem = async (req: Request, res: Response) => {
       });
     }
 
-    const newItem = new Item({ host_id, name_item, oid, type, unit });
+    const newItem = new Item({ host_id, name_item, oid, type, unit, interval });
     await newItem.save({ session });
+
+    scheduleItem(newItem);
 
     const updatedHost = await Host.findByIdAndUpdate(
       host_id,
@@ -106,6 +109,8 @@ export const deleteItem = async (req: Request, res: Response) => {
         throw new Error(`No item found with ID: ${item_id}`);
       }
 
+      clearSchedule(item_id);
+
       await Host.updateMany(
         { items: item_id },
         { $pull: { items: item_id } }
@@ -127,6 +132,53 @@ export const deleteItem = async (req: Request, res: Response) => {
     res.status(500).json({
       status: "error",
       message: "Failed to delete item.",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+export const updateItem = async (req: Request, res: Response) => {
+  try {
+    const item_id = req.params.id;
+
+    if (!item_id) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Item ID is required to update an item.",
+      });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const updatedItem = await Item.findByIdAndUpdate(
+        item_id,
+        { $set: req.body },
+        { new: true, session }
+      );
+
+      if (!updatedItem) {
+        throw new Error(`No item found with ID: ${item_id}`);
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(200).json({
+        status: "success",
+        message: `Item with ID: ${item_id} updated successfully.`,
+        data: updatedItem,
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "Failed to update item.",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
