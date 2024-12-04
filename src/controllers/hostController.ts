@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Host from "../models/Host";
 import Item from "../models/Item";
 import { Request, Response } from "express";
-import { ObjectId } from "mongodb";
+import { clearSchedule, scheduleItem } from "../services/schedulerService";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -118,6 +118,7 @@ export const createHost = async (req: Request, res: Response) => {
       }));
 
       const insertedItems = await Item.insertMany(itemDocuments, { session });
+      insertedItems.forEach((item) => scheduleItem(item));
       newHost.items = insertedItems.map((item) => item._id);
       await newHost.save({ session });
     }
@@ -167,9 +168,13 @@ export const deleteHost = async (req: Request, res: Response) => {
       Array.isArray(deletedHost.items) &&
       deletedHost.items.length > 0
     ) {
-      await Item.deleteMany({ _id: { $in: deletedHost.items } }).session(
-        session
-      );
+      deletedHost.items.forEach((itemId) => {
+        clearSchedule(itemId.toString());
+      });
+
+      await Item.deleteMany({
+        _id: { $in: deletedHost.items },
+      }).session(session);
     }
 
     await session.commitTransaction();
@@ -221,7 +226,6 @@ export const updateHost = async (req: Request, res: Response) => {
       hostgroup,
       name_template,
       details,
-      items,
     } = req.body;
 
     const updatedHost = await Host.findByIdAndUpdate(
@@ -241,27 +245,6 @@ export const updateHost = async (req: Request, res: Response) => {
 
     if (!updatedHost) {
       throw new Error(`No host found with ID: ${host_id}`);
-    }
-
-    // Update items
-    if (Array.isArray(items)) {
-      // Remove existing items
-      await Item.deleteMany({ host_id: updatedHost._id }).session(session);
-
-      // Add new items
-      if (items.length > 0) {
-        const itemDocuments = items.map((item) => ({
-          ...item,
-          host_id: updatedHost._id,
-        }));
-
-        const insertedItems = await Item.insertMany(itemDocuments, { session });
-        updatedHost.items = insertedItems.map((item) => item._id);
-        await updatedHost.save({ session });
-      } else {
-        updatedHost.items = [];
-        await updatedHost.save({ session });
-      }
     }
 
     await session.commitTransaction();

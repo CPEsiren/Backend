@@ -15,7 +15,7 @@ router.get("/:id", getHostById);
 
 router.post("/", createHost);
 
-router.post("/edit/:id", updateHost);
+router.put("/edit/:id", updateHost);
 
 router.delete("/:id", deleteHost);
 
