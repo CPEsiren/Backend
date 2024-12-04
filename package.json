@@ -19,12 +19,15 @@
     "mongodb": "^6.11.0",
     "mongoose": "^8.8.3",
     "net-snmp": "^3.15.1",
-    "nodemailer": "^6.9.16"
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^6.9.16",
+    "twilio": "^5.3.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.9",
+    "@types/node-schedule": "^2.1.7",
     "nodemon": "^3.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
