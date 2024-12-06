@@ -50,14 +50,40 @@ export async function fetchAndStoreSnmpDataForItem(item: any) {
       return;
     }
 
+    // Get the current value
+    const currentValue = parseFloat(result.value.toString());
+    const currentTimestamp = new Date();
+
+    // Find the latest data for this item
+    const latestData = await Data.findOne({
+      "metadata.item_id": item._id,
+      "metadata.host_id": host._id,
+    }).sort({ timestamp: -1 });
+
+    let simpleChange = currentValue;
+    let changePerSecond = 0;
+
+    if (latestData) {
+      const previousValue = parseFloat(latestData.value as string);
+      const previousTimestamp = new Date(latestData.timestamp as Date);
+
+      simpleChange = currentValue - previousValue;
+
+      const timeDifferenceInSeconds =
+        (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
+      changePerSecond = simpleChange / timeDifferenceInSeconds;
+    }
+
     // Create a new Data document
     const newData = new Data({
       metadata: {
         item_id: item._id,
         host_id: host._id,
       },
-      timestamp: new Date(),
-      value: result.value.toString(),
+      timestamp: currentTimestamp,
+      value: currentValue.toString(),
+      Simple_change: simpleChange.toString(),
+      Change_per_second: changePerSecond.toString(),
     });
 
     // Save the data to the database
