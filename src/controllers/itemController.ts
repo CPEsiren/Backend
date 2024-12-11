@@ -3,6 +3,7 @@ import Host from "../models/Host";
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
+import { fetchInterfaceHost } from "../services/snmpService";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -36,6 +37,8 @@ export const createItem = async (req: Request, res: Response) => {
   try {
     const { host_id, name_item, oid, type, unit, interval } = req.body;
 
+    console.log(interval);
+
     if (!host_id || !name_item || !oid || !type || !unit) {
       return res.status(400).json({
         status: "fail",
@@ -44,7 +47,25 @@ export const createItem = async (req: Request, res: Response) => {
       });
     }
 
-    const newItem = new Item({ host_id, name_item, oid, type, unit, interval });
+    let intervalValue = interval;
+    if (typeof intervalValue !== "number") {
+      intervalValue = Number(intervalValue);
+      if (isNaN(intervalValue) || intervalValue <= 0) {
+        return res.status(400).json({
+          status: "fail",
+          message: "Interval must be a positive number.",
+        });
+      }
+    }
+
+    const newItem = new Item({
+      host_id,
+      name_item,
+      oid,
+      type,
+      unit,
+      interval: intervalValue,
+    });
     await newItem.save({ session });
 
     scheduleItem(newItem);
@@ -180,6 +201,40 @@ export const updateItem = async (req: Request, res: Response) => {
       status: "error",
       message: "Failed to update item.",
       error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+export const scanInterface = async (req: Request, res: Response) => {
+  try {
+    const { ip_address, community, port, version } = req.body;
+
+    if (!ip_address || !community || !port || !version) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: ["ip_address", "community", "port", "version"],
+      });
+    }
+
+    const interfaces = await fetchInterfaceHost(
+      ip_address,
+      community,
+      port,
+      version
+    );
+
+    res.status(201).json({
+      status: "success",
+      data: interfaces,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    res.status(500).json({
+      status: "error",
+      message: "Failed to scan interfaces.",
+      error: errorMessage,
     });
   }
 };

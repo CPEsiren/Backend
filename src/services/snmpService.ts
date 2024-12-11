@@ -1,7 +1,16 @@
 import Host from "../models/Host";
 import Data from "../models/Data";
+import Item from "../models/Item";
 import snmp from "net-snmp";
 
+interface InterfaceItem {
+  name_item: string;
+  oid: string;
+  type: string;
+  unit: string;
+  interval: number;
+  status: number;
+}
 export async function fetchAndStoreSnmpDataForItem(item: any) {
   try {
     // Find the host associated with this item
@@ -9,22 +18,10 @@ export async function fetchAndStoreSnmpDataForItem(item: any) {
     if (!host) {
       throw new Error(`Host not found for item ${item._id}`);
     }
-
-    const SNMP_VERSIONS: Record<string, any> = {
-      v1: snmp.Version1,
-      v2: snmp.Version2c,
-      v2c: snmp.Version2c,
-      v3: snmp.Version3,
-    };
-
-    const snmpVersion =
-      SNMP_VERSIONS[(host.snmp_version as string).toLowerCase()] ||
-      snmp.Version2c;
-
     // Create SNMP session
     const session = snmp.createSession(host.ip_address, host.community, {
       port: host.snmp_port,
-      version: snmpVersion,
+      version: getSnmpVersion(host.snmp_version as string),
     });
 
     // Fetch SNMP data
@@ -98,4 +95,132 @@ export async function fetchAndStoreSnmpDataForItem(item: any) {
       error
     );
   }
+}
+
+export async function fetchDetailHost(host: any) {
+  // Define a constant object for system details OIDs
+  const SYSTEM_DETAIL_OIDS = {
+    Descr: "1.3.6.1.2.1.1.1.0",
+    UpTime: "1.3.6.1.2.1.1.3.0",
+    Contact: "1.3.6.1.2.1.1.4.0",
+    Name: "1.3.6.1.2.1.1.5.0",
+    Location: "1.3.6.1.2.1.1.6.0",
+  } as const;
+
+  // Create a type for the keys of SYSTEM_DETAIL_OIDS
+  type SystemDetailKey = keyof typeof SYSTEM_DETAIL_OIDS;
+  try {
+    // Create SNMP session
+    const session = snmp.createSession(host.ip_address, host.community, {
+      port: host.snmp_port,
+      version: getSnmpVersion(host.snmp_version),
+    });
+
+    const oids = Object.values(SYSTEM_DETAIL_OIDS);
+    const result = await new Promise<any[]>((resolve, reject) => {
+      session.get(oids, (error: any, varbinds: any[]) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(varbinds);
+        }
+      });
+    });
+
+    session.close();
+
+    const details: Record<string, string> = {};
+    result.forEach((varbind, index) => {
+      if (!snmp.isVarbindError(varbind)) {
+        const key = Object.keys(SYSTEM_DETAIL_OIDS)[index] as SystemDetailKey;
+        details[key] = varbind.value.toString();
+      }
+    });
+
+    // Update the host document with the new details
+    await Host.findByIdAndUpdate(host._id, {
+      $set: { details: details, status: 1 },
+    });
+
+    console.log(`Details updated for host ${host.hostname}`);
+  } catch (error) {
+    console.error(`Error in fetchDetailHost for host ${host.hostname}:`, error);
+  }
+}
+
+export async function fetchInterfaceHost(
+  ip_address: string,
+  community: string,
+  port: number,
+  version: string
+): Promise<InterfaceItem[]> {
+  const session = snmp.createSession(ip_address, community, {
+    port,
+    version: getSnmpVersion(version),
+  });
+  const oid = "1.3.6.1.2.1.2.2";
+  const columns = [1, 2, 3, 4, 5, 7, 8];
+
+  const INTERFACE_METRICS = [
+    { suffix: "InOctets", oid: "10", type: "Counter64", unit: "Octets" },
+    { suffix: "InUcastPkts", oid: "11", type: "Counter64", unit: "Packets" },
+    { suffix: "InNUcastPkts", oid: "12", type: "Counter64", unit: "Packets" },
+    { suffix: "InDiscards", oid: "13", type: "Counter64", unit: "Packets" },
+    { suffix: "InErrors", oid: "14", type: "Counter64", unit: "Packets" },
+    {
+      suffix: "InUnknownProtos",
+      oid: "15",
+      type: "Counter64",
+      unit: "Packets",
+    },
+    { suffix: "OutOctets", oid: "16", type: "Counter64", unit: "Octets" },
+    { suffix: "OutUcastPkts", oid: "17", type: "Counter64", unit: "Packets" },
+    { suffix: "OutNUcastPkts", oid: "18", type: "Counter64", unit: "Packets" },
+    { suffix: "OutDiscards", oid: "19", type: "Counter64", unit: "Packets" },
+    { suffix: "OutErrors", oid: "20", type: "Counter64", unit: "Packets" },
+    { suffix: "OutQLen", oid: "21", type: "Gauge32", unit: "Packets" },
+  ];
+
+  try {
+    const table: snmp.TableEntry[] = await new Promise((resolve, reject) => {
+      session.tableColumns(oid, columns, 20, (error: any, table: any) => {
+        if (error) reject(error);
+        else resolve(table);
+      });
+    });
+
+    const interfaceItems: InterfaceItem[] = Object.entries(table).flatMap(
+      ([index, row]) => {
+        const interfaceIndex = parseInt(index, 10);
+        const interfaceName =
+          row[2]?.toString() || `Interface ${interfaceIndex}`;
+
+        return INTERFACE_METRICS.map((metric) => ({
+          name_item: `${interfaceName}_${metric.suffix}`,
+          oid: `1.3.6.1.2.1.2.2.1.${metric.oid}.${interfaceIndex}`,
+          type: metric.type,
+          unit: metric.unit,
+          interval: 10,
+          status: 0,
+        }));
+      }
+    );
+
+    return interfaceItems;
+  } catch (error) {
+    console.error("Error fetching interface details:", error);
+    throw error;
+  } finally {
+    session.close();
+  }
+}
+
+function getSnmpVersion(version: string): number {
+  const SNMP_VERSIONS: { [key: string]: number } = {
+    v1: snmp.Version1,
+    v2: snmp.Version2c,
+    v2c: snmp.Version2c,
+    v3: snmp.Version3,
+  };
+  return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
 }
