@@ -3,6 +3,8 @@ import mongoose, { Schema } from "mongoose";
 const dataSchema: Schema = new mongoose.Schema(
   {
     value: { type: String, required: true },
+    Simple_change: { type: String, required: true },
+    Change_per_second: { type: String, required: true },
     timestamp: { type: Date, required: true, default: Date.now() },
     metadata: {
       host_id: {
