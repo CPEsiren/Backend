@@ -3,6 +3,7 @@ import Host from "../models/Host";
 import Item from "../models/Item";
 import { Request, Response } from "express";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
+import { fetchDetailHost } from "../services/snmpService";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -126,10 +127,14 @@ export const createHost = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
+    await fetchDetailHost(newHost);
+
+    const updatedHost = await Host.findById(newHost._id);
+
     res.status(201).json({
       status: "success",
       message: "Host created successfully.",
-      data: newHost,
+      data: updatedHost,
     });
   } catch (error) {
     await session.abortTransaction();
