@@ -13,7 +13,7 @@ router.get("/", getAllItem);
 
 router.post("/", createItem);
 
-router.get("/interface", scanInterface);
+router.get("/interface/", scanInterface);
 
 router.put("/edit/:id", updateItem);
 

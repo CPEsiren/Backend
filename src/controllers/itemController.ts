@@ -207,7 +207,7 @@ export const updateItem = async (req: Request, res: Response) => {
 
 export const scanInterface = async (req: Request, res: Response) => {
   try {
-    const { ip_address, community, port, version } = req.body;
+    const { ip_address, port, version, community } = req.query;
 
     if (!ip_address || !community || !port || !version) {
       return res.status(400).json({
@@ -218,10 +218,10 @@ export const scanInterface = async (req: Request, res: Response) => {
     }
 
     const interfaces = await fetchInterfaceHost(
-      ip_address,
-      community,
-      port,
-      version
+      ip_address as string,
+      community as string,
+      parseInt(port as string, 10),
+      version as string
     );
 
     res.status(201).json({
