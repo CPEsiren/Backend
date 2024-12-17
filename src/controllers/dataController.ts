@@ -17,6 +17,8 @@ export const getAllData = async (req: Request, res: Response) => {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
+              Simple_change: "$Simple_change",
+              Change_per_second: "$Change_per_second",
             },
           },
         },
@@ -83,6 +85,8 @@ export const getData = async (req: Request, res: Response) => {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
+              Simple_change: "$Simple_change",
+              Change_per_second: "$Change_per_second",
             },
           },
         },
