@@ -17,14 +17,14 @@ interface IHost extends Document {
 
 const hostSchema: Schema<IHost> = new mongoose.Schema(
   {
-    hostname: { type: String, required: true, index: true },
-    ip_address: { type: String, required: true, index: true },
+    hostname: { type: String, required: true },
+    ip_address: { type: String, required: true },
     snmp_port: { type: String, required: true },
     snmp_version: { type: String, default: "v2c" },
     snmp_community: { type: String, required: true },
-    hostgroup: { type: String, sparse: true },
-    template_name: { type: String, sparse: true },
-    status: { type: Number, default: 0, index: true },
+    hostgroup: { type: String, required: true },
+    template_name: { type: String },
+    status: { type: Number, default: 0 },
     details: { type: Object },
     items: [{ type: Schema.Types.ObjectId, ref: "Item" }],
   },
