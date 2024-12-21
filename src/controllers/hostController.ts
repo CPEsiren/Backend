@@ -120,7 +120,9 @@ export const createHost = async (req: Request, res: Response) => {
 
       const insertedItems = await Item.insertMany(itemDocuments, { session });
       insertedItems.forEach((item) => scheduleItem(item));
-      newHost.items = insertedItems.map((item) => item._id);
+      newHost.items = insertedItems.map(
+        (item) => item._id
+      ) as mongoose.Types.ObjectId[];
       await newHost.save({ session });
     }
 
