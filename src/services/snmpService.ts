@@ -6,10 +6,9 @@ import snmp from "net-snmp";
 interface InterfaceItem {
   name_item: string;
   oid: string;
-  type: string;
   unit: string;
+  type: string;
   interval: number;
-  status: number;
 }
 export async function fetchAndStoreSnmpDataForItem(item: any) {
   try {
@@ -19,7 +18,7 @@ export async function fetchAndStoreSnmpDataForItem(item: any) {
       throw new Error(`Host not found for item ${item._id}`);
     }
     // Create SNMP session
-    const session = snmp.createSession(host.ip_address, host.community, {
+    const session = snmp.createSession(host.ip_address, host.snmp_community, {
       port: host.snmp_port,
       version: getSnmpVersion(host.snmp_version as string),
     });
@@ -164,21 +163,12 @@ export async function fetchInterfaceHost(
   const INTERFACE_METRICS = [
     { suffix: "InOctets", oid: "10", type: "Counter64", unit: "Octets" },
     { suffix: "InUcastPkts", oid: "11", type: "Counter64", unit: "Packets" },
-    { suffix: "InNUcastPkts", oid: "12", type: "Counter64", unit: "Packets" },
     { suffix: "InDiscards", oid: "13", type: "Counter64", unit: "Packets" },
     { suffix: "InErrors", oid: "14", type: "Counter64", unit: "Packets" },
-    {
-      suffix: "InUnknownProtos",
-      oid: "15",
-      type: "Counter64",
-      unit: "Packets",
-    },
     { suffix: "OutOctets", oid: "16", type: "Counter64", unit: "Octets" },
     { suffix: "OutUcastPkts", oid: "17", type: "Counter64", unit: "Packets" },
-    { suffix: "OutNUcastPkts", oid: "18", type: "Counter64", unit: "Packets" },
     { suffix: "OutDiscards", oid: "19", type: "Counter64", unit: "Packets" },
     { suffix: "OutErrors", oid: "20", type: "Counter64", unit: "Packets" },
-    { suffix: "OutQLen", oid: "21", type: "Gauge32", unit: "Packets" },
   ];
 
   try {
@@ -189,22 +179,41 @@ export async function fetchInterfaceHost(
       });
     });
 
-    const interfaceItems: InterfaceItem[] = Object.entries(table).flatMap(
-      ([index, row]) => {
-        const interfaceIndex = parseInt(index, 10);
-        const interfaceName =
-          row[2]?.toString() || `Interface ${interfaceIndex}`;
-
-        return INTERFACE_METRICS.map((metric) => ({
-          name_item: `${interfaceName}_${metric.suffix}`,
-          oid: `1.3.6.1.2.1.2.2.1.${metric.oid}.${interfaceIndex}`,
-          type: metric.type,
-          unit: metric.unit,
-          interval: 10,
-          status: 0,
-        }));
-      }
+    const activeInterfaces = Object.entries(table).filter(
+      ([, row]) => row[8] === 1
     );
+
+    const interfaceItems: InterfaceItem[] = [];
+
+    for (const [index, row] of activeInterfaces) {
+      const interfaceIndex = parseInt(index, 10);
+      const interfaceName =
+        row[2]
+          .toString()
+          .replace(/\0/g, "")
+          .replace(/[^\x20-\x7E]/g, "")
+          .trim() || `Interface ${interfaceIndex}`;
+
+      for (const metric of INTERFACE_METRICS) {
+        const currentOid = `1.3.6.1.2.1.2.2.1.${metric.oid}.${interfaceIndex}`;
+        const value = await new Promise<number | null>((resolve, reject) => {
+          session.get([currentOid], (error: any, varbinds: any) => {
+            if (error) reject(error);
+            else resolve(varbinds[0]?.value || null);
+          });
+        });
+
+        if (value && value > 0) {
+          interfaceItems.push({
+            name_item: `${interfaceName} ${metric.suffix}`,
+            oid: currentOid,
+            type: metric.type,
+            unit: metric.unit,
+            interval: 10,
+          });
+        }
+      }
+    }
 
     return interfaceItems;
   } catch (error) {
