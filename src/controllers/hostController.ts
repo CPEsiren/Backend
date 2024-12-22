@@ -41,7 +41,7 @@ export const getHostById = async (req: Request, res: Response) => {
       });
     }
 
-    const host = await Host.findById(host_id).lean().exec();
+    const host = await Host.findById(host_id).populate("items").lean().exec();
 
     if (!host) {
       return res.status(404).json({
