@@ -1,7 +1,11 @@
 import Host from "../models/Host";
 import Data from "../models/Data";
-import Item from "../models/Item";
+import Item, { IItem } from "../models/Item";
 import snmp from "net-snmp";
+import mongoose from "mongoose";
+import Event from "../models/Event";
+import Trigger, { ITrigger } from "../models/Trigger";
+import { hasTrigger } from "./alertService";
 
 interface InterfaceItem {
   name_item: string;
@@ -10,7 +14,7 @@ interface InterfaceItem {
   type: string;
   interval: number;
 }
-export async function fetchAndStoreSnmpDataForItem(item: any) {
+export async function fetchAndStoreSnmpDataForItem(item: IItem) {
   try {
     // Find the host associated with this item
     const host = await Host.findById(item.host_id);
@@ -78,19 +82,53 @@ export async function fetchAndStoreSnmpDataForItem(item: any) {
       },
       timestamp: currentTimestamp,
       value: currentValue.toString(),
-      Simple_change: simpleChange.toString(),
       Change_per_second: changePerSecond.toString(),
     });
 
     // Save the data to the database
     await newData.save();
 
+    // Check if there is a trigger for this item4
+    const triggers = await hasTrigger(
+      changePerSecond,
+      host._id as mongoose.Types.ObjectId,
+      item._id as mongoose.Types.ObjectId
+    );
+
+    if (triggers.triggered) {
+      const trigger = await Trigger.findById(triggers.triggeredIds[0]);
+      const lastEvent = await Event.findOne({
+        trigger_id: triggers.triggeredIds[0],
+        status: "PROBLEM",
+      });
+      if (!lastEvent) {
+        const newEvent = new Event({
+          trigger_id: triggers.triggeredIds[0],
+          status: "PROBLEM",
+          message: ` ${triggers.highestSeverity} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`,
+        });
+        await newEvent.save();
+      }
+    } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
+      const trigger = await Trigger.findById(triggers.triggeredIds[0]);
+      triggers.triggeredIds.forEach(async (triggerId) => {
+        const active_event = await Event.findOne({
+          trigger_id: triggerId,
+          status: "PROBLEM",
+        });
+        if (active_event) {
+          active_event.status = "RESOLVED";
+          await active_event.save();
+        }
+      });
+    }
+
     console.log(
-      `Data saved for item ${item.name_item} of host ${host.hostname}`
+      `Data saved for item ${item.item_name} of host ${host.hostname}`
     );
   } catch (error) {
     console.error(
-      `Error in fetchAndStoreSnmpDataForItem for item ${item.name_item} of host ${item.host_id}:`,
+      `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}:`,
       error
     );
   }

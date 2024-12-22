@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-interface IItem extends Document {
+export interface IItem extends Document {
   host_id: mongoose.Types.ObjectId;
-  name_item: string;
+  item_name: string;
   oid: string;
   type: string;
   unit: string;
@@ -19,7 +19,7 @@ const itemSchema: Schema<IItem> = new mongoose.Schema(
       ref: "Host",
       required: true,
     },
-    name_item: { type: String, required: true },
+    item_name: { type: String, required: true },
     oid: { type: String, required: true },
     type: { type: String, required: true },
     unit: { type: String, required: true },
