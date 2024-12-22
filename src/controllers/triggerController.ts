@@ -76,7 +76,9 @@ const createTrigger = async (req: Request, res: Response) => {
     if (existingTrigger) {
       return res
         .status(409)
-        .json({ message: "Trigger with this name already exists" });
+        .json({
+          message: "Trigger with this name and severity already exists",
+        });
     }
 
     // Create new trigger
