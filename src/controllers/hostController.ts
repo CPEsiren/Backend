@@ -7,7 +7,7 @@ import { fetchDetailHost } from "../services/snmpService";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
-    const hosts = await Host.find().lean().exec();
+    const hosts = await Host.find().populate("items").lean().exec();
 
     if (!hosts.length) {
       return res.status(404).json({

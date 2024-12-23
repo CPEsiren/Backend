@@ -1,12 +1,6 @@
 import nodemailer from "nodemailer";
 
-interface ISendMail {
-  to: string;
-  subject: string;
-  message: string;
-}
-
-export async function send({ to, subject, message }: ISendMail) {
+export async function sendEmail(to: string, subject: string, message: string) {
   var transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,

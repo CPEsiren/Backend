@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
-import Trigger, { ITrigger } from "../models/Trigger";
-import Event, { IEvent } from "../models/Event";
+import Trigger from "../models/Trigger";
+import { IMedia } from "../models/Media";
+import { sendLine } from "../services/lineService";
+import { sendEmail } from "../services/mailService";
 
 interface TriggerResult {
   triggered: boolean;
@@ -89,5 +91,25 @@ export async function hasTrigger(
       highestSeverity: null,
       triggeredIds: triggers.map((t) => t._id as mongoose.Types.ObjectId),
     };
+  }
+}
+
+export async function sendNotification(
+  media: IMedia,
+  messageTemplate: string,
+  message: string
+) {
+  const combinedMessage = messageTemplate.replace("{}", message);
+
+  if (media.type === "email") {
+    // sendEmail(media.details[0].email, "Alert", combinedMessage);
+    console.log(
+      `Sending email to ${media.details.email} with message: ${message}`
+    );
+  } else if (media.type === "line") {
+    // sendLine(media.details[0].user_id, combinedMessage);
+    console.log(
+      `Sending LINE message to ${media.details.userId} with message: ${message}`
+    );
   }
 }

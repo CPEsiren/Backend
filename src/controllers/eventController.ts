@@ -28,7 +28,14 @@ const getEvents = async (req: Request, res: Response) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const events = await Event.find(query)
-      // .populate("trigger_id")
+      .populate({
+        path: "trigger_id",
+        select: "host_id",
+        populate: {
+          path: "host_id",
+          select: "hostname",
+        },
+      })
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(Number(limit));

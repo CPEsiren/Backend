@@ -4,3 +4,5 @@ declare module "net-snmp" {
 }
 
 declare module "nodemailer";
+
+declare module "bcrypt";

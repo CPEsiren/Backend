@@ -12,7 +12,7 @@ const router = express.Router();
 router.get("/", getTriggers);
 router.get("/:id", getTrigger);
 router.post("/", createTrigger);
-// router.put("/:id", updateTrigger);
+router.put("/:id", updateTrigger);
 router.delete("/:id", deleteTrigger);
 
 export default router;
