@@ -4,8 +4,10 @@ import Item, { IItem } from "../models/Item";
 import snmp from "net-snmp";
 import mongoose from "mongoose";
 import Event from "../models/Event";
-import Trigger, { ITrigger } from "../models/Trigger";
-import { hasTrigger } from "./alertService";
+import Trigger from "../models/Trigger";
+import { hasTrigger, sendNotification } from "./alertService";
+import Action, { IAction } from "../models/Action";
+import Media, { IMedia } from "../models/Media";
 
 interface InterfaceItem {
   name_item: string;
@@ -102,15 +104,30 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         status: "PROBLEM",
       });
       if (!lastEvent) {
+        const message = ` ${triggers.highestSeverity} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`;
         const newEvent = new Event({
           trigger_id: triggers.triggeredIds[0],
           status: "PROBLEM",
-          message: ` ${triggers.highestSeverity} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`,
+          message: message,
         });
         await newEvent.save();
+
+        Action.find({ enabled: true }).then((actions: IAction[]) => {
+          actions.forEach(async (action: IAction) => {
+            const media = await Media.findById(action.media_id);
+            if (media) {
+              sendNotification(
+                media,
+                action.messageTemplate,
+                "Problem: " + message
+              );
+            } else {
+              console.error(`Media not found for action ${action._id}`);
+            }
+          });
+        });
       }
     } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
-      const trigger = await Trigger.findById(triggers.triggeredIds[0]);
       triggers.triggeredIds.forEach(async (triggerId) => {
         const active_event = await Event.findOne({
           trigger_id: triggerId,
@@ -119,6 +136,21 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         if (active_event) {
           active_event.status = "RESOLVED";
           await active_event.save();
+
+          Action.find({ enabled: true }).then((actions: IAction[]) => {
+            actions.forEach(async (action: IAction) => {
+              const media = await Media.findById(action.media_id);
+              if (media) {
+                sendNotification(
+                  media,
+                  action.messageTemplate,
+                  "Resolved: " + active_event.message
+                );
+              } else {
+                console.error(`Media not found for action ${action._id}`);
+              }
+            });
+          });
         }
       });
     }
@@ -140,7 +172,6 @@ export async function fetchDetailHost(host: any) {
     Descr: "1.3.6.1.2.1.1.1.0",
     UpTime: "1.3.6.1.2.1.1.3.0",
     Contact: "1.3.6.1.2.1.1.4.0",
-    Name: "1.3.6.1.2.1.1.5.0",
     Location: "1.3.6.1.2.1.1.6.0",
   } as const;
 
