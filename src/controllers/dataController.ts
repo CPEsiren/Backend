@@ -39,7 +39,7 @@ export const getAllData = async (req: Request, res: Response) => {
     await Data.populate(data, {
       path: "items.item_id",
       model: "Item",
-      select: "_id name_item oid type unit",
+      select: "_id item_name oid type unit",
     });
 
     await Data.populate(data, {
