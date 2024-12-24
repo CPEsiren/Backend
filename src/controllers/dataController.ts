@@ -17,6 +17,8 @@ export const getAllData = async (req: Request, res: Response) => {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
+              Simple_change: "$Simple_change",
+              Change_per_second: "$Change_per_second",
             },
           },
         },
@@ -37,7 +39,7 @@ export const getAllData = async (req: Request, res: Response) => {
     await Data.populate(data, {
       path: "items.item_id",
       model: "Item",
-      select: "_id name_item oid type unit",
+      select: "_id item_name oid type unit",
     });
 
     await Data.populate(data, {
@@ -83,6 +85,8 @@ export const getData = async (req: Request, res: Response) => {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
+              Simple_change: "$Simple_change",
+              Change_per_second: "$Change_per_second",
             },
           },
         },

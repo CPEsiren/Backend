@@ -1,17 +1,28 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
-const dataSchema: Schema = new mongoose.Schema(
+interface IData extends Document {
+  value: string;
+  Change_per_second: string;
+  timestamp: Date;
+  metadata: {
+    host_id: mongoose.Types.ObjectId;
+    item_id: mongoose.Types.ObjectId;
+  };
+}
+
+const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: String, required: true },
-    timestamp: { type: Date, required: true, default: Date.now() },
+    Change_per_second: { type: String, required: true },
+    timestamp: { type: Date, required: true, default: Date.now },
     metadata: {
       host_id: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: "Host",
         required: true,
       },
       item_id: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: "Item",
         required: true,
       },
@@ -27,4 +38,4 @@ const dataSchema: Schema = new mongoose.Schema(
   }
 );
 
-export default mongoose.model("Data", dataSchema);
+export default mongoose.model<IData>("Data", dataSchema);

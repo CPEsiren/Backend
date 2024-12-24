@@ -3,10 +3,11 @@ import Host from "../models/Host";
 import Item from "../models/Item";
 import { Request, Response } from "express";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
+import { fetchDetailHost } from "../services/snmpService";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
-    const hosts = await Host.find().lean().exec();
+    const hosts = await Host.find().populate("items").lean().exec();
 
     if (!hosts.length) {
       return res.status(404).json({
@@ -40,7 +41,7 @@ export const getHostById = async (req: Request, res: Response) => {
       });
     }
 
-    const host = await Host.findById(host_id).lean().exec();
+    const host = await Host.findById(host_id).populate("items").lean().exec();
 
     if (!host) {
       return res.status(404).json({
@@ -119,17 +120,23 @@ export const createHost = async (req: Request, res: Response) => {
 
       const insertedItems = await Item.insertMany(itemDocuments, { session });
       insertedItems.forEach((item) => scheduleItem(item));
-      newHost.items = insertedItems.map((item) => item._id);
+      newHost.items = insertedItems.map(
+        (item) => item._id
+      ) as mongoose.Types.ObjectId[];
       await newHost.save({ session });
     }
 
     await session.commitTransaction();
     session.endSession();
 
+    await fetchDetailHost(newHost);
+
+    const updatedHost = await Host.findById(newHost._id);
+
     res.status(201).json({
       status: "success",
       message: "Host created successfully.",
-      data: newHost,
+      data: updatedHost,
     });
   } catch (error) {
     await session.abortTransaction();

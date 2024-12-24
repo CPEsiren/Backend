@@ -1,6 +1,8 @@
 declare module "net-snmp" {
-  const netSnmp: any;
+  const snmp: any;
   export = netSnmp;
 }
 
 declare module "nodemailer";
+
+declare module "bcrypt";

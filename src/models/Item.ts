@@ -1,25 +1,36 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
-const itemSchema = new mongoose.Schema({
-  host_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Host",
-    required: true,
-  },
-  name_item: { type: String, required: true },
-  oid: { type: String, required: true },
-  type: { type: String, required: true },
-  unit: { type: String, required: true },
-  interval: { type: Number, default: 60 },
-  status: { type: Number, default: 0 },
-  createAt: {
-    type: Date,
-    default: Date.now(),
-  },
-  updateAt: {
-    type: Date,
-    default: Date.now(),
-  },
-});
+export interface IItem extends Document {
+  host_id: mongoose.Types.ObjectId;
+  item_name: string;
+  oid: string;
+  type: string;
+  unit: string;
+  interval: number;
+  status: number;
+  createAt: Date;
+  updateAt: Date;
+}
 
-export default mongoose.model("Item", itemSchema);
+const itemSchema: Schema<IItem> = new mongoose.Schema(
+  {
+    host_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Host",
+      required: true,
+    },
+    item_name: { type: String, required: true },
+    oid: { type: String, required: true },
+    type: { type: String, required: true },
+    unit: { type: String, required: true },
+    interval: { type: Number, default: 10 },
+    status: { type: Number, default: 0 },
+  },
+  {
+    timestamps: { createdAt: "createAt", updatedAt: "updateAt" },
+  }
+);
+
+itemSchema.index({ host_id: 1, name_item: 1 }, { unique: true });
+
+export default mongoose.model<IItem>("Item", itemSchema);

@@ -1,11 +1,11 @@
 import mongoose, { Schema } from "mongoose";
 
 const templateSchema = new mongoose.Schema({
-  name_template: { type: String, required: true, unique: true },
+  template_name: { type: String, required: true, unique: true },
   items: [
     {
-      name_item: { type: String },
-      oit: { type: String },
+      item_name: { type: String },
+      oid: { type: String },
       type: { type: String },
       unit: { type: String },
     },
