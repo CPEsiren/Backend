@@ -169,7 +169,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 export async function fetchDetailHost(host: any) {
   // Define a constant object for system details OIDs
   const SYSTEM_DETAIL_OIDS = {
-    Descr: "1.3.6.1.2.1.1.1.0",
+    Model: "1.3.6.1.2.1.1.1.0",
     UpTime: "1.3.6.1.2.1.1.3.0",
     Contact: "1.3.6.1.2.1.1.4.0",
     Location: "1.3.6.1.2.1.1.6.0",

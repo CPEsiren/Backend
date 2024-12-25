@@ -185,8 +185,15 @@ export const deleteHost = async (req: Request, res: Response) => {
       }).session(session);
     }
 
-    // Delete the corresponding Host data from the Data collection
-    await Data.deleteMany({ host_id: host_id }).session(session);
+    // Check if there's any data associated with the host
+    const dataCount = await Data.countDocuments({ host_id: host_id }).session(
+      session
+    );
+
+    if (dataCount > 0) {
+      // Delete the corresponding Host data from the Data collection
+      await Data.deleteMany({ host_id: host_id }).session(session);
+    }
 
     await session.commitTransaction();
     session.endSession();
