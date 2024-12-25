@@ -10,7 +10,7 @@ import Action, { IAction } from "../models/Action";
 import Media, { IMedia } from "../models/Media";
 
 interface InterfaceItem {
-  name_item: string;
+  item_name: string;
   oid: string;
   unit: string;
   type: string;
@@ -112,20 +112,20 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         });
         await newEvent.save();
 
-        Action.find({ enabled: true }).then((actions: IAction[]) => {
-          actions.forEach(async (action: IAction) => {
-            const media = await Media.findById(action.media_id);
-            if (media) {
-              sendNotification(
-                media,
-                action.messageTemplate,
-                "Problem: " + message
-              );
-            } else {
-              console.error(`Media not found for action ${action._id}`);
-            }
-          });
-        });
+        // Action.find({ enabled: true }).then((actions: IAction[]) => {
+        //   actions.forEach(async (action: IAction) => {
+        //     const media = await Media.findById(action.media_id);
+        //     if (media) {
+        //       sendNotification(
+        //         media,
+        //         action.messageTemplate,
+        //         "Problem: " + message
+        //       );
+        //     } else {
+        //       console.error(`Media not found for action ${action._id}`);
+        //     }
+        //   });
+        // });
       }
     } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
       triggers.triggeredIds.forEach(async (triggerId) => {
@@ -137,20 +137,20 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           active_event.status = "RESOLVED";
           await active_event.save();
 
-          Action.find({ enabled: true }).then((actions: IAction[]) => {
-            actions.forEach(async (action: IAction) => {
-              const media = await Media.findById(action.media_id);
-              if (media) {
-                sendNotification(
-                  media,
-                  action.messageTemplate,
-                  "Resolved: " + active_event.message
-                );
-              } else {
-                console.error(`Media not found for action ${action._id}`);
-              }
-            });
-          });
+          // Action.find({ enabled: true }).then((actions: IAction[]) => {
+          //   actions.forEach(async (action: IAction) => {
+          //     const media = await Media.findById(action.media_id);
+          //     if (media) {
+          //       sendNotification(
+          //         media,
+          //         action.messageTemplate,
+          //         "Resolved: " + active_event.message
+          //       );
+          //     } else {
+          //       console.error(`Media not found for action ${action._id}`);
+          //     }
+          //   });
+          // });
         }
       });
     }
@@ -175,6 +175,9 @@ export async function fetchDetailHost(host: any) {
     Location: "1.3.6.1.2.1.1.6.0",
   } as const;
 
+  const oid = "1.3.6.1.2.1.2.2";
+  const columns = [1, 2, 3, 4, 5, 7, 8];
+
   // Create a type for the keys of SYSTEM_DETAIL_OIDS
   type SystemDetailKey = keyof typeof SYSTEM_DETAIL_OIDS;
   try {
@@ -195,6 +198,22 @@ export async function fetchDetailHost(host: any) {
       });
     });
 
+    const table: snmp.TableEntry[] = await new Promise((resolve, reject) => {
+      session.tableColumns(oid, columns, 20, (error: any, table: any) => {
+        if (error) reject(error);
+        else resolve(table);
+      });
+    });
+
+    const interfaces = Object.entries(table).map(([index, row]) => ({
+      interface_name:
+        row[2].toString().replace(/\0/g, "").trim() || `Interface ${index}`,
+      interface_type: row[3].toString(),
+      interface_speed: row[5].toString(),
+      interface_Adminstatus: row[7] === 1 ? "up" : "down",
+      interface_Operstatus: row[8] === 1 ? "up" : "down",
+    }));
+
     session.close();
 
     const details: Record<string, string> = {};
@@ -207,7 +226,7 @@ export async function fetchDetailHost(host: any) {
 
     // Update the host document with the new details
     await Host.findByIdAndUpdate(host._id, {
-      $set: { details: details, status: 1 },
+      $set: { interfaces: interfaces, details: details, status: 1 },
     });
 
     console.log(`Details updated for host ${host.hostname}`);
@@ -274,7 +293,7 @@ export async function fetchInterfaceHost(
 
         if (value && value > 0) {
           interfaceItems.push({
-            name_item: `${interfaceName} ${metric.suffix}`,
+            item_name: `${interfaceName} ${metric.suffix}`,
             oid: currentOid,
             type: metric.type,
             unit: metric.unit,

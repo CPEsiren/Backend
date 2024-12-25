@@ -31,6 +31,6 @@ const itemSchema: Schema<IItem> = new mongoose.Schema(
   }
 );
 
-itemSchema.index({ host_id: 1, name_item: 1 }, { unique: true });
+itemSchema.index({ host_id: 1, item_name: 1 }, { unique: true });
 
 export default mongoose.model<IItem>("Item", itemSchema);

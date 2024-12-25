@@ -13,6 +13,15 @@ interface IHost extends Document {
   items: mongoose.Types.ObjectId[];
   createAt: Date;
   updateAt: Date;
+  interfaces: [
+    {
+      interface_name: string;
+      interface_type: string;
+      interface_speed: string;
+      interface_Adminstatus: string;
+      interface_Operstatus: string;
+    }
+  ];
 }
 
 const hostSchema: Schema<IHost> = new mongoose.Schema(
@@ -27,6 +36,15 @@ const hostSchema: Schema<IHost> = new mongoose.Schema(
     status: { type: Number, default: 0 },
     details: { type: Object },
     items: [{ type: Schema.Types.ObjectId, ref: "Item" }],
+    interfaces: [
+      {
+        interface_name: { type: String, required: true },
+        interface_type: { type: String, required: true },
+        interface_speed: { type: String, required: true },
+        interface_Adminstatus: { type: String, required: true },
+        interface_Operstatus: { type: String, required: true },
+      },
+    ],
   },
   {
     timestamps: { createdAt: "createAt", updatedAt: "updateAt" },
