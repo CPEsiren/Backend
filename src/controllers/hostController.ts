@@ -4,6 +4,7 @@ import Item from "../models/Item";
 import { Request, Response } from "express";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
 import { fetchDetailHost } from "../services/snmpService";
+import Data from "../models/Data";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -183,6 +184,9 @@ export const deleteHost = async (req: Request, res: Response) => {
         _id: { $in: deletedHost.items },
       }).session(session);
     }
+
+    // Delete the corresponding Host data from the Data collection
+    await Data.deleteMany({ host_id: host_id }).session(session);
 
     await session.commitTransaction();
     session.endSession();
