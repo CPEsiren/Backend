@@ -163,6 +163,53 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}:`,
       error
     );
+    await checkSnmpConnection(item.host_id.toString());
+  }
+}
+
+export async function checkSnmpConnection(host_id: string): Promise<void> {
+  try {
+    // Find the host by ID
+    const host = await Host.findById(host_id);
+    if (!host) {
+      console.error(`Host not found for ID: ${host_id}`);
+      return;
+    }
+
+    // Create SNMP session
+    const session = snmp.createSession(host.ip_address, host.snmp_community, {
+      port: host.snmp_port,
+      version: getSnmpVersion(host.snmp_version as string),
+      timeout: 5000, // 5 seconds timeout
+      retries: 1,
+    });
+
+    // Try to fetch a simple OID (system description) to test the connection
+    const oid = "1.3.6.1.2.1.1.1.0"; // System Description OID
+
+    await new Promise<void>((resolve) => {
+      session.get([oid], async (error: any, varbinds: any) => {
+        session.close();
+
+        if (error || snmp.isVarbindError(varbinds[0])) {
+          host.status = 0;
+        } else {
+          host.status = 1;
+        }
+
+        await host.save();
+        resolve();
+      });
+    });
+  } catch (error) {
+    console.error(`Error checking SNMP connection for host ${host_id}:`, error);
+    // Update the host with error status
+    await Host.findByIdAndUpdate(host_id, {
+      snmp_status: 0,
+      snmp_status_message: `Error checking SNMP connection: ${
+        (error as Error).message
+      }`,
+    });
   }
 }
 
