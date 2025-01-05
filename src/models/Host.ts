@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-interface IHost extends Document {
+export interface IHost extends Document {
   hostname: string;
   ip_address: string;
   snmp_port: string;

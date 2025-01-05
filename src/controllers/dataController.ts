@@ -12,6 +12,7 @@ export const getAllData = async (req: Request, res: Response) => {
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
+            item_type: "$metadata.item_type",
           },
           data: {
             $push: {
@@ -29,6 +30,7 @@ export const getAllData = async (req: Request, res: Response) => {
           items: {
             $push: {
               item_id: "$_id.item_id",
+              item_type: "$_id.item_type",
               data: "$data",
             },
           },
@@ -46,6 +48,22 @@ export const getAllData = async (req: Request, res: Response) => {
       path: "_id",
       model: "Host",
       select: "hostname",
+    });
+
+    data.forEach((host: any) => {
+      host.items = host.items.map((item: any) => {
+        if (item.item_type && item.item_id) {
+          return {
+            ...item,
+            item_id: {
+              ...item.item_id._doc,
+              item_name: `${item.item_id.item_name} (${item.item_type})`,
+              unit: "%",
+            },
+          };
+        }
+        return item;
+      });
     });
 
     if (!data.length) {

@@ -1,13 +1,11 @@
 import Host from "../models/Host";
-import Data from "../models/Data";
-import Item, { IItem } from "../models/Item";
+import Data, { IData } from "../models/Data";
+import { IItem } from "../models/Item";
 import snmp from "net-snmp";
 import mongoose from "mongoose";
 import Event from "../models/Event";
 import Trigger from "../models/Trigger";
-import { hasTrigger, sendNotification } from "./alertService";
-import Action, { IAction } from "../models/Action";
-import Media, { IMedia } from "../models/Media";
+import { hasTrigger } from "./alertService";
 
 interface InterfaceItem {
   item_name: string;
@@ -104,7 +102,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         status: "PROBLEM",
       });
       if (!lastEvent) {
-        const message = ` ${triggers.highestSeverity} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`;
+        const message = ` ${triggers.highestSeverity?.toLocaleUpperCase} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`;
         const newEvent = new Event({
           trigger_id: triggers.triggeredIds[0],
           status: "PROBLEM",
@@ -641,4 +639,81 @@ function getSnmpVersion(version: string): number {
     v3: snmp.Version3,
   };
   return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
+}
+
+export async function calculateAndStoreBandwidth(item: IItem): Promise<void> {
+  // Check if the OID is for incoming or outgoing traffic
+  if (
+    item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
+    item.oid.includes("1.3.6.1.2.1.2.2.1.16")
+  ) {
+    const isIncoming = item.oid.includes("1.3.6.1.2.1.2.2.1.10");
+    const bandwidthType = isIncoming
+      ? "bandwidth incoming"
+      : "bandwidth outgoing";
+
+    // Extract the interface number from the OID
+    const baseOid = isIncoming
+      ? "1.3.6.1.2.1.2.2.1.10"
+      : "1.3.6.1.2.1.2.2.1.16";
+    const interfaceNumber = item.oid.replace(baseOid + ".", "");
+
+    const host = await Host.findOne({
+      _id: item.host_id,
+    });
+
+    if (host) {
+      const ifspeed =
+        host.interfaces[parseInt(interfaceNumber) - 1].interface_speed;
+      const lastTwoDataPoints = await Data.find({
+        "metadata.item_id": item._id,
+      })
+        .sort({ timestamp: -1 })
+        .limit(2)
+        .lean();
+
+      if (lastTwoDataPoints.length === 2) {
+        const [newerData, olderData] = lastTwoDataPoints as IData[];
+        const timeDiff =
+          newerData.timestamp.getTime() - olderData.timestamp.getTime();
+        const valueDiff =
+          parseFloat(newerData.value) - parseFloat(olderData.value);
+
+        // Calculate bandwidth in bits per second
+        const bandwidthBps = (valueDiff * 8) / timeDiff;
+
+        const bandwidthUtilization = (bandwidthBps / parseInt(ifspeed)) * 100;
+
+        // Create a new Data document for the calculated bandwidth
+        const bandwidthData = new Data({
+          timestamp: new Date(),
+          metadata: {
+            host_id: item.host_id,
+            item_id: item._id,
+            item_type: bandwidthType,
+          },
+          value: bandwidthUtilization.toFixed(2).toString(),
+          Change_per_second: bandwidthUtilization.toFixed(2).toString(),
+        });
+
+        // Save the bandwidth data
+        await bandwidthData.save();
+
+        console.log(
+          `Calculated and stored ${bandwidthType}: ${bandwidthUtilization.toFixed(
+            2
+          )} %`
+        );
+      } else {
+        console.log(
+          `Not enough data points to calculate bandwidth for item ${item._id}`
+        );
+      }
+    } else {
+      console.log("Host not found");
+    }
+    // Fetch the last two data points for the item
+  } else {
+    console.log(`OID ${item.oid} is not for bandwidth calculation`);
+  }
 }
