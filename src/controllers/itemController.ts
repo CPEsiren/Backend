@@ -4,6 +4,7 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
 import { fetchInterfaceHost } from "../services/snmpService";
+import Data from "../models/Data";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -35,15 +36,15 @@ export const createItem = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const { host_id, name_item, oid, type, unit, interval } = req.body;
+    const { host_id, item_name, oid, type, unit, interval } = req.body;
 
     console.log(interval);
 
-    if (!host_id || !name_item || !oid || !type || !unit) {
+    if (!host_id || !item_name || !oid || !type || !unit) {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: ["host_id", "name_item", "oid", "type", "unit"],
+        requiredFields: ["host_id", "item_name", "oid", "type", "unit"],
       });
     }
 
@@ -60,7 +61,7 @@ export const createItem = async (req: Request, res: Response) => {
 
     const newItem = new Item({
       host_id,
-      name_item,
+      item_name,
       oid,
       type,
       unit,
@@ -139,6 +140,10 @@ export const deleteItem = async (req: Request, res: Response) => {
 
       await session.commitTransaction();
       session.endSession();
+
+      await Data.deleteMany({
+        "metadata.item_id": new mongoose.Types.ObjectId(item_id),
+      });
 
       res.status(200).json({
         status: "success",
