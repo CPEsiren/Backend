@@ -1,28 +1,32 @@
-import Item from "../models/Item";
-import Host from "../models/Host";
-import { Request, Response } from "express";
-import mongoose from "mongoose";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
 import { fetchInterfaceHost } from "../services/snmpService";
+import { addLog } from "../services/logService";
+import { Request, Response } from "express";
+import Item from "../models/Item";
+import Host from "../models/Host";
 import Data from "../models/Data";
+import mongoose from "mongoose";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
     const item = await Item.find().lean().exec();
 
     if (!item.length) {
+      await addLog("WARNING", "No item found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No item found.",
       });
     }
 
+    await addLog("INFO", "Item fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Item fetched successfully.",
       data: item,
     });
   } catch (error) {
+    await addLog("ERROR", `Error fetching item: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching item.",
@@ -38,9 +42,8 @@ export const createItem = async (req: Request, res: Response) => {
   try {
     const { host_id, item_name, oid, type, unit, interval } = req.body;
 
-    console.log(interval);
-
     if (!host_id || !item_name || !oid || !type || !unit) {
+      await addLog("WARNING", "Missing required fields.", false);
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
@@ -52,6 +55,7 @@ export const createItem = async (req: Request, res: Response) => {
     if (typeof intervalValue !== "number") {
       intervalValue = Number(intervalValue);
       if (isNaN(intervalValue) || intervalValue <= 0) {
+        await addLog("WARNING", "Interval must be a positive number.", false);
         return res.status(400).json({
           status: "fail",
           message: "Interval must be a positive number.",
@@ -84,9 +88,14 @@ export const createItem = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
+    await addLog(
+      "INFO",
+      `Item [${newItem.item_name}] of host [${updatedHost.hostname}] created successfully.`,
+      true
+    );
     res.status(201).json({
       status: "success",
-      message: "Item created successfully.",
+      message: `Item [${newItem.item_name}] of host [${updatedHost.hostname}] created successfully.`,
       data: newItem,
     });
   } catch (error) {
@@ -94,12 +103,14 @@ export const createItem = async (req: Request, res: Response) => {
     session.endSession();
 
     if (error instanceof Error && error.message === "Host not found.") {
+      await addLog("ERROR", "Host not found.", false);
       return res.status(404).json({
         status: "fail",
         message: "Host not found.",
       });
     }
 
+    await addLog("ERROR", `Error creating item: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Error creating item.",
@@ -145,9 +156,16 @@ export const deleteItem = async (req: Request, res: Response) => {
         "metadata.item_id": new mongoose.Types.ObjectId(item_id),
       });
 
+      const host = await Host.findById(deletedItem.host_id);
+
+      await addLog(
+        "INFO",
+        `Item with [${deletedItem.item_name}] of host [${host?.hostname}] deleted successfully.`,
+        true
+      );
       res.status(200).json({
         status: "success",
-        message: `Item with ID: ${item_id} deleted successfully.`,
+        message: `Item with [${deletedItem.item_name}] of host [${host?.hostname}] deleted successfully.`,
       });
     } catch (error) {
       await session.abortTransaction();
@@ -155,6 +173,7 @@ export const deleteItem = async (req: Request, res: Response) => {
       throw error;
     }
   } catch (error) {
+    await addLog("ERROR", `Failed to delete item: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to delete item.",
@@ -168,6 +187,7 @@ export const updateItem = async (req: Request, res: Response) => {
     const item_id = req.params.id;
 
     if (!item_id) {
+      await addLog("WARNING", "Invalid item ID.", false);
       return res.status(400).json({
         status: "fail",
         message: "Item ID is required to update an item.",
@@ -191,9 +211,16 @@ export const updateItem = async (req: Request, res: Response) => {
       await session.commitTransaction();
       session.endSession();
 
+      const host = await Host.findById(updatedItem.host_id);
+
+      await addLog(
+        "INFO",
+        `Item with ID: [${updatedItem.item_name}] of host [${host?.hostname}] updated successfully.`,
+        true
+      );
       res.status(200).json({
         status: "success",
-        message: `Item with ID: ${item_id} updated successfully.`,
+        message: `Item with ID: [${updatedItem.item_name}] of host [${host?.hostname}] updated successfully.`,
         data: updatedItem,
       });
     } catch (error) {
@@ -202,6 +229,7 @@ export const updateItem = async (req: Request, res: Response) => {
       throw error;
     }
   } catch (error) {
+    await addLog("ERROR", `Failed to update item: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to update item.",
@@ -215,6 +243,7 @@ export const scanInterface = async (req: Request, res: Response) => {
     const { ip_address, port, version, community } = req.query;
 
     if (!ip_address || !community || !port || !version) {
+      await addLog("WARNING", "Missing required fields.", false);
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
@@ -229,6 +258,7 @@ export const scanInterface = async (req: Request, res: Response) => {
       version as string
     );
 
+    await addLog("INFO", "Interfaces scanned successfully.", false);
     res.status(201).json({
       status: "success",
       data: interfaces,
@@ -236,6 +266,8 @@ export const scanInterface = async (req: Request, res: Response) => {
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
+
+    await addLog("ERROR", `Failed to scan interfaces: ${errorMessage}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to scan interfaces.",
