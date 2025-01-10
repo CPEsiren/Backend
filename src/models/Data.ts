@@ -15,7 +15,7 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: String, required: true },
     Change_per_second: { type: String, required: true },
-    timestamp: { type: Date, required: true, default: Date.now },
+    timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
         type: Schema.Types.ObjectId,
