@@ -1,3 +1,4 @@
+import { addLog } from "./logService";
 import nodemailer from "nodemailer";
 
 export async function sendEmail(to: string, subject: string, message: string) {
@@ -19,9 +20,10 @@ export async function sendEmail(to: string, subject: string, message: string) {
 
   try {
     await transporter.sendMail(mailOptions);
+    await addLog("INFO", `email sent to ${to}`, false);
     return true;
   } catch (error) {
-    console.error("error sending email ", error);
+    await addLog("ERROR", `error sending email: ${error}`, false);
     return false;
   }
 }
