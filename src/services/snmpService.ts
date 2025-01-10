@@ -1,11 +1,14 @@
-import Host from "../models/Host";
-import Data, { IData } from "../models/Data";
-import { IItem } from "../models/Item";
-import snmp from "net-snmp";
-import mongoose from "mongoose";
-import Event from "../models/Event";
+import { hasTrigger, sendNotification } from "./alertService";
+import Action, { IAction } from "../models/Action";
+import { addLog, createTime } from "./logService";
+import Host, { IHost } from "../models/Host";
+import Data from "../models/Data";
+import Item, { IItem } from "../models/Item";
 import Trigger from "../models/Trigger";
-import { hasTrigger } from "./alertService";
+import Event from "../models/Event";
+import Media from "../models/Media";
+import mongoose from "mongoose";
+import snmp from "net-snmp";
 
 interface InterfaceItem {
   item_name: string;
@@ -15,153 +18,165 @@ interface InterfaceItem {
   interval: number;
 }
 export async function fetchAndStoreSnmpDataForItem(item: IItem) {
-  try {
-    // Find the host associated with this item
-    const host = await Host.findById(item.host_id);
-    if (!host) {
-      throw new Error(`Host not found for item ${item._id}`);
-    }
-    // Create SNMP session
-    const session = snmp.createSession(host.ip_address, host.snmp_community, {
-      port: host.snmp_port,
-      version: getSnmpVersion(host.snmp_version as string),
-    });
-
-    // Fetch SNMP data
-    const oids = [item.oid];
-    const result = await new Promise<any>((resolve, reject) => {
-      session.get(oids, (error: any, varbinds: any) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(varbinds[0]);
-        }
-      });
-    });
-
-    // Close the SNMP session
-    session.close();
-
-    // Process the result
-    if (snmp.isVarbindError(result)) {
-      console.error(
-        `Error fetching OID ${item.oid}: ${snmp.varbindError(result)}`
-      );
-      return;
-    }
-
-    // Get the current value
-    const currentValue = parseFloat(result.value.toString());
-    const currentTimestamp = new Date();
-
-    // Find the latest data for this item
-    const latestData = await Data.findOne({
-      "metadata.item_id": item._id,
-      "metadata.host_id": host._id,
-    }).sort({ timestamp: -1 });
-
-    let simpleChange = currentValue;
-    let changePerSecond = 0;
-
-    if (latestData) {
-      const previousValue = parseFloat(latestData.value as string);
-      const previousTimestamp = new Date(latestData.timestamp as Date);
-
-      simpleChange = currentValue - previousValue;
-
-      const timeDifferenceInSeconds =
-        (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
-      changePerSecond = simpleChange / timeDifferenceInSeconds;
-    }
-
-    // Create a new Data document
-    const newData = new Data({
-      metadata: {
-        item_id: item._id,
-        host_id: host._id,
-      },
-      timestamp: currentTimestamp,
-      value: currentValue.toString(),
-      Change_per_second: changePerSecond.toString(),
-    });
-
-    // Save the data to the database
-    await newData.save();
-
-    // Check if there is a trigger for this item4
-    const triggers = await hasTrigger(
-      changePerSecond,
-      host._id as mongoose.Types.ObjectId,
-      item._id as mongoose.Types.ObjectId
-    );
-
-    if (triggers.triggered) {
-      const trigger = await Trigger.findById(triggers.triggeredIds[0]);
-      const lastEvent = await Event.findOne({
-        trigger_id: triggers.triggeredIds[0],
-        status: "PROBLEM",
-      });
-      if (!lastEvent) {
-        const message = ` ${triggers.highestSeverity?.toLocaleUpperCase} with item ${item.item_name} of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${trigger?.ComparisonOperator} ${trigger?.valuetrigger} ${item.unit}/s.`;
-        const newEvent = new Event({
-          trigger_id: triggers.triggeredIds[0],
-          status: "PROBLEM",
-          message: message,
-        });
-        await newEvent.save();
-
-        // Action.find({ enabled: true }).then((actions: IAction[]) => {
-        //   actions.forEach(async (action: IAction) => {
-        //     const media = await Media.findById(action.media_id);
-        //     if (media) {
-        //       sendNotification(
-        //         media,
-        //         action.messageTemplate,
-        //         "Problem: " + message
-        //       );
-        //     } else {
-        //       console.error(`Media not found for action ${action._id}`);
-        //     }
-        //   });
-        // });
+  if (!item.isBandwidth) {
+    try {
+      // Find the host associated with this item
+      const host = await Host.findById(item.host_id);
+      if (!host) {
+        throw new Error(`Host not found for item ${item._id}`);
       }
-    } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
-      triggers.triggeredIds.forEach(async (triggerId) => {
-        const active_event = await Event.findOne({
-          trigger_id: triggerId,
-          status: "PROBLEM",
-        });
-        if (active_event) {
-          active_event.status = "RESOLVED";
-          await active_event.save();
-
-          // Action.find({ enabled: true }).then((actions: IAction[]) => {
-          //   actions.forEach(async (action: IAction) => {
-          //     const media = await Media.findById(action.media_id);
-          //     if (media) {
-          //       sendNotification(
-          //         media,
-          //         action.messageTemplate,
-          //         "Resolved: " + active_event.message
-          //       );
-          //     } else {
-          //       console.error(`Media not found for action ${action._id}`);
-          //     }
-          //   });
-          // });
-        }
+      // Create SNMP session
+      const session = snmp.createSession(host.ip_address, host.snmp_community, {
+        port: host.snmp_port,
+        version: getSnmpVersion(host.snmp_version as string),
       });
-    }
 
-    console.log(
-      `Data saved for item ${item.item_name} of host ${host.hostname}`
-    );
-  } catch (error) {
-    console.error(
-      `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}:`,
-      error
-    );
-    await checkSnmpConnection(item.host_id.toString());
+      // Fetch SNMP data
+      const oids = [item.oid];
+      const result = await new Promise<any>((resolve, reject) => {
+        session.get(oids, (error: any, varbinds: any) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(varbinds[0]);
+          }
+        });
+      });
+
+      // Close the SNMP session
+      session.close();
+
+      // Process the result
+      if (snmp.isVarbindError(result)) {
+        await addLog(
+          "ERROR",
+          `Error fetching OID ${item.oid}: ${snmp.varbindError(result)}`,
+          false
+        );
+        return;
+      }
+
+      // Get the current value
+      const currentValue = parseFloat(result.value.toString());
+      const currentTimestamp = new Date(await createTime());
+      await addLog(
+        "INFO",
+        `[${item.item_name}] currentValue: ${currentValue}, currentTimestamp: ${currentTimestamp}`,
+        false
+      );
+
+      // Find the latest data for this item
+      const latestData = await Data.findOne({
+        "metadata.item_id": item._id,
+        "metadata.host_id": host._id,
+      }).sort({ timestamp: -1 });
+
+      let deltaValue = 0;
+      let changePerSecond = 0;
+
+      if (latestData) {
+        const previousValue = parseFloat(latestData.value as string);
+        const previousTimestamp = new Date(latestData.timestamp as Date);
+        await addLog(
+          "INFO",
+          `[${item.item_name}] previousValue: ${previousValue}, previousTimestamp: ${previousTimestamp}`,
+          false
+        );
+
+        deltaValue = currentValue - previousValue;
+
+        const timeDifferenceInSeconds =
+          (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
+        changePerSecond = deltaValue / timeDifferenceInSeconds;
+        await addLog(
+          "INFO",
+          `[${item.item_name}] deltaValue: ${deltaValue}, timeDifferenceInSeconds: ${timeDifferenceInSeconds}`,
+          false
+        );
+
+        if (
+          item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
+          item.oid.includes("1.3.6.1.2.1.2.2.1.16")
+        ) {
+          await addLog(
+            "INFO",
+            `[${item.item_name}] calculate bandwidth......`,
+            false
+          );
+          let index = 0;
+          if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
+            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", "")) - 1;
+          } else {
+            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", "")) - 1;
+          }
+          await addLog("INFO", `[${item.item_name}] index: ${index}`, false);
+          const ifspeed = host.interfaces[index];
+
+          const up = deltaValue * 8 * 100;
+          const down =
+            timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
+          const bandwidthUtilization = up / down;
+          await addLog(
+            "INFO",
+            `[${item.item_name}] bandwidthUtilization: ${up}/${down} = ${bandwidthUtilization}`,
+            false
+          );
+          const itembandwidth = await Item.findOne({
+            host_id: host._id,
+            oid: item.oid,
+            isBandwidth: true,
+          });
+
+          if (itembandwidth) {
+            const bandwidthData = new Data({
+              metadata: {
+                item_id: itembandwidth._id,
+                host_id: host._id,
+              },
+              timestamp: currentTimestamp,
+              value: bandwidthUtilization.toFixed(2).toString(),
+              Change_per_second: bandwidthUtilization.toFixed(2).toString(),
+            });
+            await bandwidthData.save();
+            await checkAndHandleTriggers(
+              itembandwidth,
+              host,
+              parseFloat(bandwidthData.Change_per_second)
+            );
+
+            await addLog(
+              "INFO",
+              `[${item.item_name}] Fetch Data for bandwidth.`,
+              false
+            );
+          }
+        }
+      }
+
+      // Create a new Data document
+      const newData = new Data({
+        metadata: {
+          item_id: item._id,
+          host_id: host._id,
+        },
+        timestamp: currentTimestamp,
+        value: currentValue.toString(),
+        Change_per_second: changePerSecond.toString(),
+      });
+
+      // Save the data to the database
+      await newData.save();
+      await addLog("INFO", `[${item.item_name}] Fetch Data.`, false);
+
+      await checkAndHandleTriggers(item, host, changePerSecond);
+    } catch (error) {
+      await addLog(
+        "ERROR",
+        `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}: ${error}`,
+        false
+      );
+      await checkSnmpConnection(item.host_id.toString());
+    }
   }
 }
 
@@ -170,7 +185,11 @@ export async function checkSnmpConnection(host_id: string): Promise<void> {
     // Find the host by ID
     const host = await Host.findById(host_id);
     if (!host) {
-      console.error(`Host not found for ID: ${host_id}`);
+      await addLog(
+        "WARNING",
+        `[checkSnmpConnection] Host not found for ID: ${host_id}`,
+        false
+      );
       return;
     }
 
@@ -200,18 +219,28 @@ export async function checkSnmpConnection(host_id: string): Promise<void> {
       });
     });
   } catch (error) {
-    console.error(`Error checking SNMP connection for host ${host_id}:`, error);
+    await addLog(
+      "ERROR",
+      `[checkSnmpConnection] Error checking SNMP connection for host ${host_id}: ${error}`,
+      false
+    );
     // Update the host with error status
     await Host.findByIdAndUpdate(host_id, {
-      snmp_status: 0,
-      snmp_status_message: `Error checking SNMP connection: ${
-        (error as Error).message
-      }`,
+      status: 0,
     });
   }
 }
 
-export async function fetchDetailHost(host: any) {
+export async function fetchDetailHost(
+  ip_address: string,
+  snmp_community: string,
+  snmp_port: string,
+  snmp_version: string
+): Promise<{
+  interfaces: any[];
+  details: Record<string, string>;
+  status: number;
+} | null> {
   // Define a constant object for system details OIDs
   const SYSTEM_DETAIL_OIDS = {
     Model: "1.3.6.1.2.1.1.1.0",
@@ -501,9 +530,9 @@ export async function fetchDetailHost(host: any) {
   type SystemDetailKey = keyof typeof SYSTEM_DETAIL_OIDS;
   try {
     // Create SNMP session
-    const session = snmp.createSession(host.ip_address, host.community, {
-      port: host.snmp_port,
-      version: getSnmpVersion(host.snmp_version),
+    const session = snmp.createSession(ip_address, snmp_community, {
+      port: snmp_port,
+      version: getSnmpVersion(snmp_version),
     });
 
     const oids = Object.values(SYSTEM_DETAIL_OIDS);
@@ -542,15 +571,19 @@ export async function fetchDetailHost(host: any) {
         details[key] = varbind.value.toString();
       }
     });
-
-    // Update the host document with the new details
-    await Host.findByIdAndUpdate(host._id, {
-      $set: { interfaces: interfaces, details: details, status: 1 },
-    });
-
-    console.log(`Details updated for host ${host.hostname}`);
+    await addLog(
+      "INFO",
+      `Fetching system details for ${ip_address} with community ${snmp_community}`,
+      false
+    );
+    return { interfaces, details, status: 1 };
   } catch (error) {
-    console.error(`Error in fetchDetailHost for host ${host.hostname}:`, error);
+    await addLog(
+      "ERROR",
+      `Error in fetchDetailHost for host ${ip_address}: ${error}`,
+      false
+    );
+    return { interfaces: [], details: {}, status: 0 };
   }
 }
 
@@ -621,10 +654,14 @@ export async function fetchInterfaceHost(
         }
       }
     }
-
+    await addLog("INFO", `Fetching interface details for ${ip_address}`, false);
     return interfaceItems;
   } catch (error) {
-    console.error("Error fetching interface details:", error);
+    await addLog(
+      "ERROR",
+      `Error in fetchInterfaceHost for host ${ip_address}: ${error}`,
+      false
+    );
     throw error;
   } finally {
     session.close();
@@ -641,79 +678,87 @@ function getSnmpVersion(version: string): number {
   return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
 }
 
-export async function calculateAndStoreBandwidth(item: IItem): Promise<void> {
-  // Check if the OID is for incoming or outgoing traffic
-  if (
-    item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
-    item.oid.includes("1.3.6.1.2.1.2.2.1.16")
-  ) {
-    const isIncoming = item.oid.includes("1.3.6.1.2.1.2.2.1.10");
-    const bandwidthType = isIncoming
-      ? "bandwidth incoming"
-      : "bandwidth outgoing";
+async function checkAndHandleTriggers(
+  item: IItem,
+  host: IHost,
+  changePerSecond: number
+) {
+  // Check if there is a trigger for this item
+  const triggers = await hasTrigger(
+    changePerSecond,
+    host._id as mongoose.Types.ObjectId,
+    item._id as mongoose.Types.ObjectId
+  );
 
-    // Extract the interface number from the OID
-    const baseOid = isIncoming
-      ? "1.3.6.1.2.1.2.2.1.10"
-      : "1.3.6.1.2.1.2.2.1.16";
-    const interfaceNumber = item.oid.replace(baseOid + ".", "");
-
-    const host = await Host.findOne({
-      _id: item.host_id,
-    });
-
-    if (host) {
-      const ifspeed =
-        host.interfaces[parseInt(interfaceNumber) - 1].interface_speed;
-      const lastTwoDataPoints = await Data.find({
-        "metadata.item_id": item._id,
-      })
-        .sort({ timestamp: -1 })
-        .limit(2)
-        .lean();
-
-      if (lastTwoDataPoints.length === 2) {
-        const [newerData, olderData] = lastTwoDataPoints as IData[];
-        const timeDiff =
-          newerData.timestamp.getTime() - olderData.timestamp.getTime();
-        const valueDiff =
-          parseFloat(newerData.value) - parseFloat(olderData.value);
-
-        // Calculate bandwidth in bits per second
-        const bandwidthBps = (valueDiff * 8) / timeDiff;
-
-        const bandwidthUtilization = (bandwidthBps / parseInt(ifspeed)) * 100;
-
-        // Create a new Data document for the calculated bandwidth
-        const bandwidthData = new Data({
-          timestamp: new Date(),
-          metadata: {
-            host_id: item.host_id,
-            item_id: item._id,
-            item_type: bandwidthType,
-          },
-          value: bandwidthUtilization.toFixed(2).toString(),
-          Change_per_second: bandwidthUtilization.toFixed(2).toString(),
-        });
-
-        // Save the bandwidth data
-        await bandwidthData.save();
-
-        console.log(
-          `Calculated and stored ${bandwidthType}: ${bandwidthUtilization.toFixed(
-            2
-          )} %`
-        );
-      } else {
-        console.log(
-          `Not enough data points to calculate bandwidth for item ${item._id}`
-        );
-      }
-    } else {
-      console.log("Host not found");
-    }
-    // Fetch the last two data points for the item
-  } else {
-    console.log(`OID ${item.oid} is not for bandwidth calculation`);
+  if (triggers.triggered) {
+    await handleTriggeredEvent(triggers, item, host, changePerSecond);
+  } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
+    await resolveExistingProblems(triggers.triggeredIds);
   }
+}
+
+async function handleTriggeredEvent(
+  triggers: any,
+  item: IItem,
+  host: IHost,
+  changePerSecond: number
+) {
+  const trigger = await Trigger.findById(triggers.triggeredIds[0]);
+  const lastEvent = await Event.findOne({
+    trigger_id: triggers.triggeredIds[0],
+    status: "PROBLEM",
+  });
+
+  if (!lastEvent) {
+    const message = ` ${triggers.highestSeverity?.toLocaleUpperCase()} with item ${
+      item.item_name
+    } of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${
+      trigger?.ComparisonOperator
+    } ${trigger?.valuetrigger} ${item.unit}/s.`;
+    const newEvent = new Event({
+      trigger_id: triggers.triggeredIds[0],
+      status: "PROBLEM",
+      message: message,
+    });
+    await newEvent.save();
+    await addLog("INFO", `Event created: ${newEvent.message}`, false);
+
+    // Send notifications for the new event
+    await sendNotifications(message, "Problem: ");
+  }
+}
+
+async function resolveExistingProblems(
+  triggeredIds: mongoose.Types.ObjectId[]
+) {
+  const resolvePromises = triggeredIds.map(async (triggerId) => {
+    const activeEvent = await Event.findOneAndUpdate(
+      { trigger_id: triggerId, status: "PROBLEM" },
+      { status: "RESOLVED" },
+      { new: true }
+    );
+
+    if (activeEvent) {
+      await addLog("INFO", `Event resolved: ${activeEvent.message}`, false);
+      await sendNotifications(activeEvent.message, "Resolved: ");
+    }
+  });
+
+  await Promise.all(resolvePromises);
+}
+
+async function sendNotifications(message: string, prefix: string) {
+  const actions = await Action.find({ enabled: true });
+  const notificationPromises = actions.map(async (action) => {
+    const media = await Media.findById(action.media_id);
+    if (media) {
+      await sendNotification(media, action.messageTemplate, prefix + message);
+    } else {
+      await addLog(
+        "WARNING",
+        `Media not found for action ${action._id}`,
+        false
+      );
+    }
+  });
 }
