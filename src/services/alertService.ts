@@ -108,18 +108,8 @@ export async function sendNotification(
   const combinedMessage = messageTemplate.replace("{}", message);
 
   if (media.type === "email") {
-    // sendEmail(media.details[0].email, "Alert", combinedMessage);
-    await addLog(
-      "INFO",
-      `Sending email to ${media.details.email} with message: ${message}`,
-      false
-    );
+    // await sendEmail(media.details[0].email, "Alert", combinedMessage);
   } else if (media.type === "line") {
-    // sendLine(media.details[0].user_id, combinedMessage);
-    await addLog(
-      "INFO",
-      `Sending LINE message to ${media.details.userId} with message: ${message}`,
-      false
-    );
+    // await sendLine(media.details[0].user_id, combinedMessage);
   }
 }
