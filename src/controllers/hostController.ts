@@ -1,28 +1,32 @@
-import mongoose from "mongoose";
-import Host from "../models/Host";
-import Item from "../models/Item";
-import { Request, Response } from "express";
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
 import { fetchDetailHost } from "../services/snmpService";
+import { addLog } from "../services/logService";
+import { Request, Response } from "express";
+import Host from "../models/Host";
+import Item from "../models/Item";
 import Data from "../models/Data";
+import mongoose from "mongoose";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
     const hosts = await Host.find().populate("items").lean().exec();
 
     if (!hosts.length) {
+      await addLog("WARNING", "No hosts found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No hosts found.",
       });
     }
 
+    await addLog("INFO", "Hosts fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Hosts fetched successfully.",
       data: hosts,
     });
   } catch (error) {
+    await addLog("ERROR", `Error fetching hosts: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching hosts.",
@@ -36,27 +40,31 @@ export const getHostById = async (req: Request, res: Response) => {
     const host_id = req.params.id;
 
     if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
+      await addLog("WARNING", "Invalid host ID.", false);
       return res.status(400).json({
         status: "fail",
-        message: "Valid host ID is required.",
+        message: "Invalid host ID is required.",
       });
     }
 
     const host = await Host.findById(host_id).populate("items").lean().exec();
 
     if (!host) {
+      await addLog("WARNING", `No host found with ID: ${host_id}`, false);
       return res.status(404).json({
         status: "fail",
         message: `No host found with ID: ${host_id}`,
       });
     }
 
+    await addLog("INFO", "Host fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Host fetched successfully.",
       data: host,
     });
   } catch (error) {
+    await addLog("ERROR", `Error fetching host: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching host.",
@@ -93,12 +101,20 @@ export const createHost = async (req: Request, res: Response) => {
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
     if (missingFields.length > 0) {
+      await addLog("WARNING", "Missing required fields.", false);
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
         requiredFields: missingFields,
       });
     }
+
+    const detailsHost = await fetchDetailHost(
+      ip_address,
+      snmp_community,
+      snmp_port,
+      snmp_version
+    );
 
     const newHost = new Host({
       hostname,
@@ -108,17 +124,53 @@ export const createHost = async (req: Request, res: Response) => {
       snmp_community,
       hostgroup,
       name_template,
-      details,
+      interfaces: detailsHost?.interfaces,
+      details: { ...details, ...detailsHost?.details },
+      status: detailsHost?.status,
     });
 
     await newHost.save({ session });
 
-    if (Array.isArray(items) && items.length > 0) {
-      const itemDocuments = items.map((item) => ({
-        ...item,
-        host_id: newHost._id,
-      }));
+    let itemDocuments: any[] = [];
 
+    const incomingBandwidthItems =
+      newHost?.interfaces.map((iface, index) => ({
+        host_id: newHost._id,
+        item_name: `${iface.interface_name} Incoming Bandwidth Utilization`,
+        oid: `1.3.6.1.2.1.2.2.1.10.${index + 1}`,
+        type: "bandwidth",
+        unit: "%",
+        isBandwidth: true,
+      })) ?? [];
+
+    const outgoingBandwidthItems =
+      newHost?.interfaces.map((iface, index) => ({
+        host_id: newHost._id,
+        item_name: `${iface.interface_name} Outgoing Bandwidth Utilization`,
+        oid: `1.3.6.1.2.1.2.2.1.16.${index + 1}`,
+        type: "bandwidth",
+        unit: "%",
+        isBandwidth: true,
+      })) ?? [];
+
+    incomingBandwidthItems.forEach((item) => {
+      itemDocuments.push(item);
+    });
+
+    outgoingBandwidthItems.forEach((item) => {
+      itemDocuments.push(item);
+    });
+
+    if (Array.isArray(items) && items.length > 0) {
+      items.forEach((item: any) => {
+        itemDocuments.push({
+          ...item,
+          host_id: newHost._id,
+        });
+      });
+    }
+
+    if (itemDocuments.length > 0) {
       const insertedItems = await Item.insertMany(itemDocuments, { session });
       insertedItems.forEach((item) => scheduleItem(item));
       newHost.items = insertedItems.map(
@@ -130,19 +182,23 @@ export const createHost = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
-    await fetchDetailHost(newHost);
+    const createdHost = await Host.findById(newHost._id);
 
-    const updatedHost = await Host.findById(newHost._id);
-
+    await addLog(
+      "INFO",
+      `Host [${newHost.hostname}] created successfully.`,
+      true
+    );
     res.status(201).json({
       status: "success",
-      message: "Host created successfully.",
-      data: updatedHost,
+      message: `Host [${newHost.hostname}] created successfully.`,
+      data: createdHost,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
+    await addLog("ERROR", `Error creating host: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Error creating host.",
@@ -159,6 +215,7 @@ export const deleteHost = async (req: Request, res: Response) => {
     const host_id = req.params.id;
 
     if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
+      await addLog("WARNING", "Invalid host ID.", false);
       return res.status(400).json({
         status: "fail",
         message: "Valid host ID is required to delete a host.",
@@ -192,6 +249,11 @@ export const deleteHost = async (req: Request, res: Response) => {
       "metadata.host_id": new mongoose.Types.ObjectId(host_id),
     });
 
+    await addLog(
+      "INFO",
+      `Host with ID: ${host_id} and its associated items deleted successfully.`,
+      true
+    );
     res.status(200).json({
       status: "success",
       message: `Host with ID: ${host_id} and its associated items deleted successfully.`,
@@ -201,12 +263,14 @@ export const deleteHost = async (req: Request, res: Response) => {
     session.endSession();
 
     if (error instanceof Error && error.message.startsWith("No host found")) {
+      await addLog("WARNING", error.message, false);
       return res.status(404).json({
         status: "fail",
         message: error.message,
       });
     }
 
+    await addLog("ERROR", `Failed to delete host: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to delete host.",
@@ -223,6 +287,7 @@ export const updateHost = async (req: Request, res: Response) => {
     const host_id = req.params.id;
 
     if (!host_id || !mongoose.Types.ObjectId.isValid(host_id)) {
+      await addLog("WARNING", "Invalid host ID.", false);
       return res.status(400).json({
         status: "fail",
         message: "Valid host ID is required to update a host.",
@@ -262,9 +327,14 @@ export const updateHost = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
+    await addLog(
+      "INFO",
+      `Host [${updatedHost.hostname}] updated successfully.`,
+      true
+    );
     res.status(200).json({
       status: "success",
-      message: "Host updated successfully.",
+      message: `Host [${updatedHost.hostname}] updated successfully.`,
       data: updatedHost,
     });
   } catch (error) {
@@ -272,12 +342,14 @@ export const updateHost = async (req: Request, res: Response) => {
     session.endSession();
 
     if (error instanceof Error && error.message.startsWith("No host found")) {
+      await addLog("ERROR", error.message, false);
       return res.status(404).json({
         status: "fail",
         message: error.message,
       });
     }
 
+    await addLog("ERROR", `Failed to update host: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to update host.",
