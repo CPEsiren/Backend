@@ -1,4 +1,3 @@
-// src/index.ts
 import app from "./App";
 
 const port: string | undefined = process.env.PORT;
