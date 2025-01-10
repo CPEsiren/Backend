@@ -1,8 +1,9 @@
-import mongoose from "mongoose";
-import Trigger from "../models/Trigger";
-import { IMedia } from "../models/Media";
-import { sendLine } from "../services/lineService";
 import { sendEmail } from "../services/mailService";
+import { sendLine } from "../services/lineService";
+import { IMedia } from "../models/Media";
+import Trigger from "../models/Trigger";
+import { addLog } from "./logService";
+import mongoose from "mongoose";
 
 interface TriggerResult {
   triggered: boolean;
@@ -62,6 +63,11 @@ export async function hasTrigger(
           break;
         default:
           console.warn(`Unknown comparison operator: ${ComparisonOperator}`);
+          await addLog(
+            "WARNNING",
+            `Unknown comparison operator: ${ComparisonOperator}`,
+            false
+          );
           continue;
       }
 
@@ -75,7 +81,7 @@ export async function hasTrigger(
     }
 
     if (highestSeverity === "critical") {
-      break; // Stop checking warning triggers if a critical trigger is activated
+      break;
     }
   }
 
@@ -103,13 +109,17 @@ export async function sendNotification(
 
   if (media.type === "email") {
     // sendEmail(media.details[0].email, "Alert", combinedMessage);
-    console.log(
-      `Sending email to ${media.details.email} with message: ${message}`
+    await addLog(
+      "INFO",
+      `Sending email to ${media.details.email} with message: ${message}`,
+      false
     );
   } else if (media.type === "line") {
     // sendLine(media.details[0].user_id, combinedMessage);
-    console.log(
-      `Sending LINE message to ${media.details.userId} with message: ${message}`
+    await addLog(
+      "INFO",
+      `Sending LINE message to ${media.details.userId} with message: ${message}`,
+      false
     );
   }
 }
