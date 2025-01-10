@@ -1,9 +1,6 @@
-// src/services/schedulerService.ts
+import { fetchAndStoreSnmpDataForItem } from "./snmpService";
+import { addLog } from "./logService";
 import Item from "../models/Item";
-import {
-  calculateAndStoreBandwidth,
-  fetchAndStoreSnmpDataForItem,
-} from "./snmpService";
 
 const schedules: { [key: string]: NodeJS.Timeout } = {};
 
@@ -22,12 +19,13 @@ export function scheduleItem(item: any) {
 
   schedules[item._id] = setInterval(async () => {
     try {
-      // console.log(`Fetching data for item ${item._id}...`);
       await fetchAndStoreSnmpDataForItem(item);
-
-      await calculateAndStoreBandwidth(item);
     } catch (error) {
-      console.error(`Error fetching data for item ${item._id}:`, error);
+      await addLog(
+        "ERROR",
+        `Error fetching data for item ${item._id}: ${error}`,
+        true
+      );
     }
   }, item.interval * 1000);
 }
