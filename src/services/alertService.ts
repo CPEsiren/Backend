@@ -20,6 +20,7 @@ export async function hasTrigger(
     host_id,
     item_id,
     severity: { $in: ["critical", "warning"] },
+    enabled: true,
   }).sort({ severity: -1 });
 
   if (!triggers || triggers.length === 0) {

@@ -15,6 +15,7 @@ export interface IHost extends Document {
   updateAt: Date;
   interfaces: [
     {
+      interface_index: number;
       interface_name: string;
       interface_type: string;
       interface_speed: string;
@@ -38,6 +39,7 @@ const hostSchema: Schema<IHost> = new mongoose.Schema(
     items: [{ type: Schema.Types.ObjectId, ref: "Item" }],
     interfaces: [
       {
+        interface_index: { type: Number, required: true },
         interface_name: { type: String, required: true },
         interface_type: { type: String, required: true },
         interface_speed: { type: String, required: true },

@@ -137,7 +137,7 @@ export const createHost = async (req: Request, res: Response) => {
       newHost?.interfaces.map((iface, index) => ({
         host_id: newHost._id,
         item_name: `${iface.interface_name} Incoming Bandwidth Utilization`,
-        oid: `1.3.6.1.2.1.2.2.1.10.${index + 1}`,
+        oid: `1.3.6.1.2.1.2.2.1.10.${iface.interface_index}`,
         type: "bandwidth",
         unit: "%",
         isBandwidth: true,
@@ -147,7 +147,7 @@ export const createHost = async (req: Request, res: Response) => {
       newHost?.interfaces.map((iface, index) => ({
         host_id: newHost._id,
         item_name: `${iface.interface_name} Outgoing Bandwidth Utilization`,
-        oid: `1.3.6.1.2.1.2.2.1.16.${index + 1}`,
+        oid: `1.3.6.1.2.1.2.2.1.16.${iface.interface_index}`,
         type: "bandwidth",
         unit: "%",
         isBandwidth: true,

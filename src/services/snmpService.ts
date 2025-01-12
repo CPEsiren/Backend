@@ -104,13 +104,24 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
             false
           );
           let index = 0;
+
           if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
-            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", "")) - 1;
+            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", ""));
           } else {
-            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", "")) - 1;
+            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", ""));
           }
-          await addLog("INFO", `[${item.item_name}] index: ${index}`, false);
-          const ifspeed = host.interfaces[index];
+          const ifspeed = host.interfaces.find(
+            (iface) => iface.interface_index === index
+          );
+
+          if (!ifspeed) {
+            await addLog(
+              "ERROR",
+              `[${item.item_name}] Interface with index ${index} not found`,
+              false
+            );
+            return;
+          }
 
           const up = deltaValue * 8 * 100;
           const down =
@@ -136,6 +147,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               timestamp: currentTimestamp,
               value: bandwidthUtilization.toFixed(2).toString(),
               Change_per_second: bandwidthUtilization.toFixed(2).toString(),
+              expireAfterSeconds: 10,
             });
             await bandwidthData.save();
             await checkAndHandleTriggers(
@@ -155,11 +167,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
       // Create a new Data document
       const newData = new Data({
+        timestamp: currentTimestamp,
         metadata: {
           item_id: item._id,
           host_id: host._id,
         },
-        timestamp: currentTimestamp,
         value: currentValue.toString(),
         Change_per_second: changePerSecond.toString(),
       });
@@ -554,6 +566,7 @@ export async function fetchDetailHost(
     });
 
     const interfaces = Object.entries(table).map(([index, row]) => ({
+      interface_index: row[1] as number,
       interface_name:
         row[2].toString().replace(/\0/g, "").trim() || `Interface ${index}`,
       interface_type: IANAifType[row[3].toString()],
@@ -603,17 +616,35 @@ export async function fetchInterfaceHost(
   const INTERFACE_METRICS = [
     { suffix: "InOctets", oid: "10", type: "Counter64", unit: "Octets" },
     { suffix: "InUcastPkts", oid: "11", type: "Counter64", unit: "Packets" },
+    {
+      suffix: " InNUcastPkts",
+      oid: "12",
+      type: "Counter64",
+      unit: "Packets",
+    },
     { suffix: "InDiscards", oid: "13", type: "Counter64", unit: "Packets" },
     { suffix: "InErrors", oid: "14", type: "Counter64", unit: "Packets" },
+    {
+      suffix: "InUnknownProtos",
+      oid: "15",
+      type: "Counter64",
+      unit: "Packets",
+    },
     { suffix: "OutOctets", oid: "16", type: "Counter64", unit: "Octets" },
     { suffix: "OutUcastPkts", oid: "17", type: "Counter64", unit: "Packets" },
+    {
+      suffix: "OutNUcastPkts",
+      oid: "18",
+      type: "Counter64",
+      unit: "Packets",
+    },
     { suffix: "OutDiscards", oid: "19", type: "Counter64", unit: "Packets" },
     { suffix: "OutErrors", oid: "20", type: "Counter64", unit: "Packets" },
   ];
 
   try {
     const table: snmp.TableEntry[] = await new Promise((resolve, reject) => {
-      session.tableColumns(oid, columns, 20, (error: any, table: any) => {
+      session.tableColumns(oid, columns, 100, (error: any, table: any) => {
         if (error) reject(error);
         else resolve(table);
       });
@@ -643,13 +674,13 @@ export async function fetchInterfaceHost(
           });
         });
 
-        if (value && value > 0) {
+        if (value) {
           interfaceItems.push({
             item_name: `${interfaceName} ${metric.suffix}`,
             oid: currentOid,
             type: metric.type,
             unit: metric.unit,
-            interval: 10,
+            interval: 60,
           });
         }
       }
