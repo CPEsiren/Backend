@@ -1,8 +1,9 @@
-import mongoose from "mongoose";
-import Trigger from "../models/Trigger";
-import { IMedia } from "../models/Media";
-import { sendLine } from "../services/lineService";
 import { sendEmail } from "../services/mailService";
+import { sendLine } from "../services/lineService";
+import { IMedia } from "../models/Media";
+import Trigger from "../models/Trigger";
+import { addLog } from "./logService";
+import mongoose from "mongoose";
 
 interface TriggerResult {
   triggered: boolean;
@@ -19,6 +20,7 @@ export async function hasTrigger(
     host_id,
     item_id,
     severity: { $in: ["critical", "warning"] },
+    enabled: true,
   }).sort({ severity: -1 });
 
   if (!triggers || triggers.length === 0) {
@@ -62,6 +64,11 @@ export async function hasTrigger(
           break;
         default:
           console.warn(`Unknown comparison operator: ${ComparisonOperator}`);
+          await addLog(
+            "WARNNING",
+            `Unknown comparison operator: ${ComparisonOperator}`,
+            false
+          );
           continue;
       }
 
@@ -75,7 +82,7 @@ export async function hasTrigger(
     }
 
     if (highestSeverity === "critical") {
-      break; // Stop checking warning triggers if a critical trigger is activated
+      break;
     }
   }
 
@@ -102,14 +109,8 @@ export async function sendNotification(
   const combinedMessage = messageTemplate.replace("{}", message);
 
   if (media.type === "email") {
-    // sendEmail(media.details[0].email, "Alert", combinedMessage);
-    console.log(
-      `Sending email to ${media.details.email} with message: ${message}`
-    );
+    // await sendEmail(media.details[0].email, "Alert", combinedMessage);
   } else if (media.type === "line") {
-    // sendLine(media.details[0].user_id, combinedMessage);
-    console.log(
-      `Sending LINE message to ${media.details.userId} with message: ${message}`
-    );
+    // await sendLine(media.details[0].user_id, combinedMessage);
   }
 }

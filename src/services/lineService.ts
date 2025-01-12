@@ -1,4 +1,8 @@
+import { addLog } from "./logService";
+import dotenv from "dotenv";
 import axios from "axios";
+
+dotenv.config();
 
 const LINE_BOT_API = "https://api.line.me/v2/bot/message/push";
 
@@ -13,23 +17,20 @@ export async function sendLine(userId: string, message: string): Promise<void> {
       to: userId,
       messages: [{ type: "text", text: message }],
     };
+    console.log(headers);
     const response = await axios.post(LINE_BOT_API, requestBody, { headers });
-
-    // console.log("Message sent successfully:", response.data);
+    await addLog("INFO", `Message sent successfully: ${response.data}`, false);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      console.error("Error sending message via LINE API:", {
-        status: error.response.status,
-        data: error.response.data,
-      });
-      throw new Error(
-        `LINE API Error: ${error.response.status} - ${JSON.stringify(
-          error.response.data
-        )}`
+      await addLog(
+        "ERROR",
+        `Error sending message via LINE API: ${error.message}, Status: ${
+          error.response.status
+        }, Data: ${JSON.stringify(error.response.data)}`,
+        false
       );
     } else {
-      console.error("Unexpected error:", error);
-      throw error;
+      await addLog("ERROR", `Unexpected error: ${error}`, false);
     }
   }
 }

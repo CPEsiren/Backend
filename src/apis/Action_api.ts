@@ -1,4 +1,3 @@
-// In your routes file (e.g., actionRoutes.ts)
 import express from "express";
 import {
   getAction,
