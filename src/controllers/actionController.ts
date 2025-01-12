@@ -1,5 +1,4 @@
-// FILEPATH: /d:/CPE-Siren/Backend/src/controllers/actionController.ts
-
+import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import Action from "../models/Action";
 
@@ -9,12 +8,13 @@ const getAction = async (req: Request, res: Response) => {
 
     const action = await Action.findById(id).populate("triggerId mediaId");
     if (!action) {
+      await addLog("WARNNING", `Action with id ${id} not found`, false);
       return res.status(404).json({ message: "Action not found" });
     }
 
-    res.json(action);
+    res.status(200).json(action);
   } catch (error) {
-    console.error("Error retrieving action:", error);
+    await addLog("ERROR", `Error retrieving action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -37,23 +37,34 @@ const getActions = async (req: Request, res: Response) => {
 
     const total = await Action.countDocuments(query);
 
-    res.json({
+    await addLog("INFO", `Fetched ${actions.length} actions`, false);
+    res.status(200).json({
       actions,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
     });
   } catch (error) {
-    console.error("Error retrieving actions:", error);
+    await addLog("ERROR", `Error retrieving actions: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
 const createAction = async (req: Request, res: Response) => {
+  const session = await Action.startSession();
+  session.startTransaction();
+
   try {
     const { action_name, media_id, messageTemplate } = req.body;
 
     if (!action_name || !media_id || !messageTemplate) {
+      await session.abortTransaction();
+      session.endSession();
+      await addLog(
+        "WARNING",
+        `Missing required fields for creating action ${action_name}`,
+        false
+      );
       return res.status(400).json({ message: "Missing required fields" });
     }
 
@@ -64,25 +75,39 @@ const createAction = async (req: Request, res: Response) => {
       enabled: true, // Default to enabled
     });
 
-    await newAction.save();
+    await newAction.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await addLog("INFO", `Action ${action_name} created successfully`, true);
 
     res.status(201).json({
       message: "Action created successfully",
       action: newAction,
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Error creating action:", error);
+    await addLog("ERROR", `Error creating action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
 const updateAction = async (req: Request, res: Response) => {
+  const session = await Action.startSession();
+  session.startTransaction();
+
   try {
     const { id } = req.params;
     const { name, media_id, messageTemplate, enabled } = req.body;
 
-    const action = await Action.findById(id);
+    const action = await Action.findById(id).session(session);
     if (!action) {
+      await session.abortTransaction();
+      session.endSession();
+      await addLog("WARNING", `Action with id ${id} not found`, false);
       return res.status(404).json({ message: "Action not found" });
     }
 
@@ -91,30 +116,58 @@ const updateAction = async (req: Request, res: Response) => {
     if (messageTemplate) action.messageTemplate = messageTemplate;
     if (enabled !== undefined) action.enabled = enabled;
 
-    await action.save();
+    await action.save({ session });
 
-    res.json({
+    await session.commitTransaction();
+    session.endSession();
+    await addLog(
+      "INFO",
+      `Action ${action.action_name} updated successfully`,
+      true
+    );
+    res.status(200).json({
       message: "Action updated successfully",
       action,
     });
   } catch (error) {
-    console.error("Error updating action:", error);
+    await session.abortTransaction();
+    session.endSession();
+    await addLog("ERROR", `Error updating action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
 const deleteAction = async (req: Request, res: Response) => {
+  const session = await Action.startSession();
+  session.startTransaction();
+
   try {
     const { id } = req.params;
 
-    const action = await Action.findByIdAndDelete(id);
+    const action = await Action.findByIdAndDelete(id).session(session);
     if (!action) {
+      await session.abortTransaction();
+      session.endSession();
+      await addLog("WARNING", `Action with id ${id} not found`, false);
       return res.status(404).json({ message: "Action not found" });
     }
 
-    res.json({ message: "Action deleted successfully" });
+    await session.commitTransaction();
+    session.endSession();
+
+    await addLog(
+      "INFO",
+      `Action [${action.action_name}] deleted successfully`,
+      true
+    );
+    res
+      .status(200)
+      .json({ message: `Action ${action.action_name} deleted successfully` });
   } catch (error) {
-    console.error("Error deleting action:", error);
+    await session.abortTransaction();
+    session.endSession();
+
+    await addLog("ERROR", `Error deleting action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };

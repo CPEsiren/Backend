@@ -1,12 +1,13 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-interface IData extends Document {
+export interface IData extends Document {
   value: string;
   Change_per_second: string;
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
     item_id: mongoose.Types.ObjectId;
+    item_type: string;
   };
 }
 
@@ -14,7 +15,7 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: String, required: true },
     Change_per_second: { type: String, required: true },
-    timestamp: { type: Date, required: true, default: Date.now },
+    timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
         type: Schema.Types.ObjectId,
@@ -26,6 +27,7 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
         ref: "Item",
         required: true,
       },
+      item_type: { type: String },
     },
   },
   {

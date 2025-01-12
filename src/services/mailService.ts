@@ -1,4 +1,8 @@
+import { addLog } from "./logService";
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export async function sendEmail(to: string, subject: string, message: string) {
   var transporter = nodemailer.createTransport({
@@ -19,9 +23,10 @@ export async function sendEmail(to: string, subject: string, message: string) {
 
   try {
     await transporter.sendMail(mailOptions);
+    await addLog("INFO", `email sent to ${to}`, false);
     return true;
   } catch (error) {
-    console.error("error sending email ", error);
+    await addLog("ERROR", `Error sending email: ${error}`, false);
     return false;
   }
 }
