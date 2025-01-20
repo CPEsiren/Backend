@@ -196,29 +196,19 @@ export const getBetween = async (req: Request, res: Response) => {
       },
     ]);
 
-    // Manually populate the data
-    const populatedData = await Promise.all(
-      data.map(async (host) => {
-        const hostDoc = await mongoose
-          .model("Host")
-          .findById(host._id)
-          .select("hostname")
-          .lean();
-        const items = await Promise.all(
-          host.items.map(async (item: any) => {
-            const itemDoc = await mongoose
-              .model("Item")
-              .findById(item.item_id)
-              .select("_id item_name oid type unit")
-              .lean();
-            return { ...item, item_id: itemDoc };
-          })
-        );
-        return { ...host, _id: hostDoc, items };
-      })
-    );
+    await Data.populate(data, {
+      path: "items.item_id",
+      model: "Item",
+      select: "_id item_name oid type unit",
+    });
 
-    if (!populatedData.length) {
+    await Data.populate(data, {
+      path: "_id",
+      model: "Host",
+      select: "hostname",
+    });
+
+    if (!data.length) {
       await addLog(
         "WARNING",
         "No data found between the specified times.",
@@ -238,7 +228,7 @@ export const getBetween = async (req: Request, res: Response) => {
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully for the specified time range.",
-      data: populatedData,
+      data: data,
     });
   } catch (err) {
     await addLog("ERROR", `Error fetching data between times: ${err}`, false);
