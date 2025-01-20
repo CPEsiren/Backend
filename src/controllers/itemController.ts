@@ -6,6 +6,7 @@ import Item from "../models/Item";
 import Host from "../models/Host";
 import Data from "../models/Data";
 import mongoose from "mongoose";
+import Trend from "../models/Trend";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -153,6 +154,10 @@ export const deleteItem = async (req: Request, res: Response) => {
       session.endSession();
 
       await Data.deleteMany({
+        "metadata.item_id": new mongoose.Types.ObjectId(item_id),
+      });
+
+      await Trend.deleteMany({
         "metadata.item_id": new mongoose.Types.ObjectId(item_id),
       });
 
