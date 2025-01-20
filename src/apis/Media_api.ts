@@ -1,4 +1,3 @@
-// In your routes file (e.g., mediaRoutes.ts)
 import express from "express";
 import {
   getMedia,
