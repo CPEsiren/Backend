@@ -75,7 +75,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       let changePerSecond = 0;
 
       if (latestData) {
-        const previousValue = parseFloat(latestData.value as string);
+        const previousValue = latestData.value;
         const previousTimestamp = new Date(latestData.timestamp as Date);
         await addLog(
           "INFO",
@@ -153,7 +153,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
             await checkAndHandleTriggers(
               itembandwidth,
               host,
-              parseFloat(bandwidthData.Change_per_second)
+              bandwidthData.Change_per_second
             );
 
             await addLog(

@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IData extends Document {
-  value: string;
-  Change_per_second: string;
+  value: number;
+  Change_per_second: number;
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
@@ -13,8 +13,8 @@ export interface IData extends Document {
 
 const dataSchema: Schema<IData> = new mongoose.Schema(
   {
-    value: { type: String, required: true },
-    Change_per_second: { type: String, required: true },
+    value: { type: Number, required: true },
+    Change_per_second: { type: Number, required: true },
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
@@ -36,7 +36,7 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
       metaField: "metadata",
       granularity: "seconds",
     },
-    expireAfterSeconds: 86400,
+    expireAfterSeconds: 604800,
   }
 );
 
