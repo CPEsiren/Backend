@@ -146,9 +146,9 @@ export const getData = async (req: Request, res: Response) => {
 };
 
 export const getBetween = async (req: Request, res: Response) => {
-  const { startTime, endTime } = req.query;
+  const { startTime, endTime, host_id } = req.query;
 
-  if (!startTime || !endTime) {
+  if (!startTime || !endTime || !host_id) {
     return res.status(400).json({
       status: "fail",
       message: "Start time and end time are required.",
@@ -159,6 +159,7 @@ export const getBetween = async (req: Request, res: Response) => {
     const data = await Data.aggregate([
       {
         $match: {
+          "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
           timestamp: {
             $gte: new Date(startTime as string),
             $lte: new Date(endTime as string),
@@ -217,6 +218,7 @@ export const getBetween = async (req: Request, res: Response) => {
       return res.status(404).json({
         status: "fail",
         message: "No data found between the specified times.",
+        data: data,
       });
     }
 
