@@ -180,6 +180,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       await newData.save();
       await addLog("INFO", `[${item.item_name}] Fetch Data.`, false);
 
+      await checkSnmpConnection(item.host_id.toString());
       await checkAndHandleTriggers(item, host, changePerSecond);
     } catch (error) {
       await addLog(
