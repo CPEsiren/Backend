@@ -178,9 +178,14 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
       // Save the data to the database
       await newData.save();
+
+      item.status = 1;
+      await item.save();
+      host.status = 1;
+      await host.save();
+
       await addLog("INFO", `[${item.item_name}] Fetch Data.`, false);
 
-      await checkSnmpConnection(item.host_id.toString());
       await checkAndHandleTriggers(item, host, changePerSecond);
     } catch (error) {
       await addLog(
@@ -188,6 +193,8 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}: ${error}`,
         false
       );
+      item.status = 0;
+      await item.save();
       await checkSnmpConnection(item.host_id.toString());
     }
   }
