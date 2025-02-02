@@ -1,7 +1,6 @@
 import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import { User } from "../models/User";
-import bcrypt from "bcrypt";
 
 const getUser = async (req: Request, res: Response) => {
   try {
@@ -61,14 +60,10 @@ const createUser = async (req: Request, res: Response) => {
         .json({ message: "Username or email already exists" });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     const newUser = new User({
       username,
       email,
-      password: hashedPassword,
+      password: password,
       role: role || "viewer",
       isActive: true,
     });
