@@ -17,7 +17,9 @@ export const connectDb = async (): Promise<void> => {
   }
 
   try {
-    await mongoose.connect(url);
+    await mongoose.connect(url, {
+      dbName: "CPE-Siren", // Specify the database name here
+    });
     await addLog("INFO", "MongoDB connected successfully.", false);
     console.log("MongoDB connected successfully.");
   } catch (error) {
