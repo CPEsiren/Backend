@@ -139,6 +139,8 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           });
 
           if (itembandwidth) {
+            itembandwidth.status = 1;
+            await itembandwidth.save();
             const bandwidthData = new Data({
               metadata: {
                 item_id: itembandwidth._id,
@@ -195,6 +197,20 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       );
       item.status = 0;
       await item.save();
+      if (
+        item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
+        item.oid.includes("1.3.6.1.2.1.2.2.1.16")
+      ) {
+        const itembandwidth = await Item.findOne({
+          host_id: item.host_id,
+          oid: item.oid,
+          isBandwidth: true,
+        });
+        if (itembandwidth) {
+          itembandwidth.status = 0;
+          await itembandwidth.save();
+        }
+      }
       await checkSnmpConnection(item.host_id.toString());
     }
   }
