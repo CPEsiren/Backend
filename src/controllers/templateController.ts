@@ -79,6 +79,62 @@ export const createTemplate = async (req: Request, res: Response) => {
   }
 };
 
+export const updateTemplate = async (req: Request, res: Response) => {
+  try {
+    const template_id = req.params.id;
+
+    if (!template_id) {
+      await addLog("WARNING", "Invalid template ID.", false);
+      return res.status(400).json({
+        status: "fail",
+        message: "template ID is required to update an template.",
+      });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const updatedItem = await Template.findByIdAndUpdate(
+        template_id,
+        { $set: req.body },
+        { new: true, session }
+      );
+
+      if (!updatedItem) {
+        throw new Error(`No template found with ID: ${template_id}`);
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      const template = await Template.findById(updatedItem._id);
+
+      await addLog(
+        "INFO",
+        `Template with ID: [${updatedItem.template_name}] of host [${template?.template_name}] updated successfully.`,
+        true
+      );
+      res.status(200).json({
+        status: "success",
+        message: `Template with ID: [${updatedItem.template_name}] of template [${template?.template_name}] updated successfully.`,
+        data: updateTemplate,
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  } catch (error) {
+    await addLog("ERROR", `Failed to update template: ${error}`, false);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to update template.",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
 export const deleteTemplate = async (req: Request, res: Response) => {
   const session = await mongoose.startSession();
   session.startTransaction();
