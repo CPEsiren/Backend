@@ -10,6 +10,7 @@ import Action from "./Action_api";
 import Media from "./Media_api";
 import User from "./User_api";
 import Dashbroad from "./Dashboard_api";
+import Authen from "./Authen_api";
 
 export const routes = express.Router();
 
@@ -23,3 +24,4 @@ routes.use("/action", Action);
 routes.use("/media", Media);
 routes.use("/user", User);
 routes.use("/dashboard", Dashbroad);
+routes.use("/authen", Authen);
