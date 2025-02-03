@@ -3,10 +3,11 @@ import mongoose, { Schema, Document } from "mongoose";
 interface IUser extends Document {
   username: string;
   email: string;
-  password?: string;
+  picture?: string;
   role: "admin" | "operator" | "viewer";
   createdAt: Date;
   isActive: boolean;
+  token: string;
 }
 
 const UserSchema: Schema<IUser> = new Schema(
@@ -14,25 +15,27 @@ const UserSchema: Schema<IUser> = new Schema(
     username: {
       type: String,
       required: true,
-      unique: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
     },
-    password: {
+    picture: {
       type: String,
-      required: true,
     },
     role: {
       type: String,
-      enum: ["admin", "operator", "viewer"],
+      enum: ["admin", "viewer"],
       default: "viewer",
     },
     isActive: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    token: {
+      type: String,
+      required: true,
     },
   },
   {
