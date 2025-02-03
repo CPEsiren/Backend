@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IEvent extends Document {
   trigger_id: mongoose.Types.ObjectId;
+  hostname: string;
   timestamp: Date;
   status: "PROBLEM" | "RESOLVED";
   message: string;
@@ -12,6 +13,10 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
     trigger_id: {
       type: Schema.Types.ObjectId,
       ref: "Trigger",
+      required: true,
+    },
+    hostname: {
+      type: String,
       required: true,
     },
     timestamp: {
