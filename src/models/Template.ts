@@ -1,4 +1,4 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 
 const templateSchema = new mongoose.Schema({
   template_name: { type: String, required: true, unique: true },
@@ -8,6 +8,7 @@ const templateSchema = new mongoose.Schema({
       oid: { type: String },
       type: { type: String },
       unit: { type: String },
+      interval: { type: Number },
     },
   ],
   description: { type: String },
