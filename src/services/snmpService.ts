@@ -772,6 +772,7 @@ async function handleTriggeredEvent(
     } ${trigger?.valuetrigger} ${item.unit}/s.`;
     const newEvent = new Event({
       trigger_id: triggers.triggeredIds[0],
+      hostname: host.hostname,
       status: "PROBLEM",
       message: message,
     });
