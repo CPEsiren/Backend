@@ -5,6 +5,7 @@ import Event from "../models/Event";
 import { User } from "../models/User";
 import { addLog } from "../services/logService";
 import { Request, Response } from "express";
+import Template from "../models/Template";
 
 export async function getDashboardCounts(req: Request, res: Response) {
   try {
@@ -13,6 +14,7 @@ export async function getDashboardCounts(req: Request, res: Response) {
     const userCount = await User.countDocuments();
     const triggerCount = await Trigger.countDocuments();
     const eventCount = await Event.countDocuments();
+    const templateCount = await Template.countDocuments();
 
     // Count hosts with status 0 and 1
     const hostDisabledCount = await Host.countDocuments({ status: 0 });
@@ -63,6 +65,9 @@ export async function getDashboardCounts(req: Request, res: Response) {
         total: eventCount,
         problem: problemEventCount,
         resolved: resolvedEventCount,
+      },
+      templates: {
+        total: templateCount,
       },
     };
 
