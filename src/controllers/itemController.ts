@@ -1,6 +1,6 @@
 import { clearSchedule, scheduleItem } from "../services/schedulerService";
 import { fetchInterfaceHost } from "../services/snmpService";
-import { addLog } from "../services/logService";
+import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Item from "../models/Item";
 import Host from "../models/Host";

@@ -3,7 +3,7 @@ import Item from "../models/Item";
 import Trigger from "../models/Trigger";
 import Event from "../models/Event";
 import { User } from "../models/User";
-import { addLog } from "../services/logService";
+import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Template from "../models/Template";
 

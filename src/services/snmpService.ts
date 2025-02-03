@@ -1,6 +1,6 @@
 import { hasTrigger, sendNotification } from "./alertService";
 import Action, { IAction } from "../models/Action";
-import { addLog, createTime } from "./logService";
+import { addLog, createTime } from "../middleware/log";
 import Host, { IHost } from "../models/Host";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";

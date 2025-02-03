@@ -1,5 +1,5 @@
 import { fetchAndStoreSnmpDataForItem } from "./snmpService";
-import { addLog } from "./logService";
+import { addLog } from "../middleware/log";
 import Item from "../models/Item";
 import Data from "../models/Data";
 import Trend from "../models/Trend";

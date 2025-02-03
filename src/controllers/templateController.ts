@@ -1,4 +1,4 @@
-import { addLog } from "../services/logService";
+import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Template from "../models/Template";
 import mongoose from "mongoose";

@@ -1,4 +1,4 @@
-import { addLog } from "./logService";
+import { addLog } from "../middleware/log";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 

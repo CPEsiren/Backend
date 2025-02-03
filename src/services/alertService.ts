@@ -2,7 +2,7 @@ import { sendEmail } from "../services/mailService";
 import { sendLine } from "../services/lineService";
 import { IMedia } from "../models/Media";
 import Trigger from "../models/Trigger";
-import { addLog } from "./logService";
+import { addLog } from "../middleware/log";
 import mongoose from "mongoose";
 
 interface TriggerResult {

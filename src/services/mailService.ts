@@ -1,4 +1,4 @@
-import { addLog } from "./logService";
+import { addLog } from "../middleware/log";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 

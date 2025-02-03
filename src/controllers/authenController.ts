@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { verifyToken } from "../services/authenService";
 import { User } from "../models/User";
-import { addLog } from "../services/logService";
+import { addLog } from "../middleware/log";
 
 export const loginUser = async (req: Request, res: Response) => {
   try {

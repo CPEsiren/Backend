@@ -1,6 +1,6 @@
 // src/app.ts
 import express, { Express, Request, Response, NextFunction } from "express";
-import { addLog, createFileLog } from "./services/logService";
+import { addLog, createFileLog } from "./middleware/log";
 import { setupSchedules } from "./services/schedulerService";
 import { connectDb } from "./services/database";
 import bodyParser from "body-parser";

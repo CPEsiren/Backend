@@ -1,4 +1,4 @@
-import { addLog } from "./logService";
+import { addLog } from "../middleware/log";
 import dotenv from "dotenv";
 import axios from "axios";
 
