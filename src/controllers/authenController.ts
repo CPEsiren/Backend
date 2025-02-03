@@ -3,7 +3,7 @@ import { verifyToken } from "../services/authenService";
 import { User } from "../models/User";
 import { addLog } from "../services/logService";
 
-export const signupUser = async (req: Request, res: Response) => {
+export const loginUser = async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
 
@@ -13,29 +13,37 @@ export const signupUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Email not verified" });
     }
 
-    let user = await User.findOne({ email: userInfo.email });
-    if (user) {
-      return res.status(400).json({ error: "User already exists" });
+    const user = await User.findOne({ email: userInfo.email });
+    if (!user) {
+      const newUser = new User({
+        username: userInfo.name,
+        email: userInfo.email,
+        picture: userInfo.picture,
+        token: token,
+      });
+      const resUser = await newUser.save();
+      await addLog(
+        "INFO",
+        `User [${resUser.username}]created and login successfully`,
+        true
+      );
+      res.status(201).json({
+        message: `User [${resUser.username}]created and login successfully`,
+        user: resUser,
+      });
+    } else {
+      user.token = token;
+      const resUser = await user.save();
+      await addLog(
+        "INFO",
+        `User [${resUser.username}] created and login successfully`,
+        true
+      );
+      res.status(201).json({
+        message: `User [${resUser.username}] login successfully`,
+        user: resUser,
+      });
     }
-
-    const newUser = new User({
-      username: userInfo.name,
-      email: userInfo.email,
-      picture: userInfo.picture,
-      token: token,
-    });
-
-    const resUser = await newUser.save();
-
-    await addLog(
-      "INFO",
-      `User [${newUser.username}]created successfully`,
-      true
-    );
-    res.status(201).json({
-      message: `User [${newUser.username}]created successfully`,
-      user: resUser,
-    });
   } catch (error) {
     await addLog("WARNING", `Invalid token: ${error}`, false);
     res.status(400).json({ error: "Invalid token" });
