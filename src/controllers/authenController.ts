@@ -1,35 +1,43 @@
 import { Request, Response } from "express";
+import { verifyToken } from "../services/authenService";
+import { User } from "../models/User";
+import { addLog } from "../services/logService";
 
 export const signupUser = async (req: Request, res: Response) => {
   try {
-    // const { token } = req.body;
-    // const userInfo = await verifyToken(token);
+    const { token } = req.body;
 
-    // if (!userInfo.email_verified) {
-    //   return res.status(400).json({ error: "Email not verified" });
-    // }
+    const userInfo = await verifyToken(token);
 
-    // // ตรวจสอบว่ามีบัญชีนี้อยู่แล้วหรือไม่
-    // let user = await User.findOne({ email: userInfo.email });
-    // if (user) {
-    //   return res.status(400).json({ error: "User already exists" });
-    // }
+    if (!userInfo?.email_verified) {
+      return res.status(400).json({ error: "Email not verified" });
+    }
 
-    // บันทึกข้อมูลผู้ใช้ใหม่ลง Database
-    // user = await User.create({
-    //   email: userInfo.email,
-    //   name: userInfo.name,
-    //   picture: userInfo.picture,
-    //   provider: "google",
-    // });
+    let user = await User.findOne({ email: userInfo.email });
+    if (user) {
+      return res.status(400).json({ error: "User already exists" });
+    }
 
-    // สร้าง Access Token เพื่อให้ผู้ใช้เข้าสู่ระบบทันที
-    // const accessToken = jwt.sign({ userId: user._id }, "YOUR_SECRET_KEY", {
-    //   expiresIn: "7d",
-    // });
+    const newUser = new User({
+      username: userInfo.name,
+      email: userInfo.email,
+      picture: userInfo.picture,
+      token: token,
+    });
 
-    res.json({ message: "Signup success", data: req.body });
+    const resUser = await newUser.save();
+
+    await addLog(
+      "INFO",
+      `User [${newUser.username}]created successfully`,
+      true
+    );
+    res.status(201).json({
+      message: `User [${newUser.username}]created successfully`,
+      user: resUser,
+    });
   } catch (error) {
+    await addLog("WARNING", `Invalid token: ${error}`, false);
     res.status(400).json({ error: "Invalid token" });
   }
 };
