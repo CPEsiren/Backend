@@ -86,7 +86,7 @@ export const createHost = async (req: Request, res: Response) => {
       snmp_version,
       snmp_community,
       hostgroup,
-      name_template,
+      template_name,
       details,
       items,
     } = req.body;
@@ -124,7 +124,7 @@ export const createHost = async (req: Request, res: Response) => {
       snmp_version,
       snmp_community,
       hostgroup,
-      name_template,
+      template_name,
       interfaces: detailsHost?.interfaces,
       details: { ...details, ...detailsHost?.details },
       status: detailsHost?.status,
