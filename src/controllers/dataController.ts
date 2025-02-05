@@ -181,6 +181,9 @@ export const getBetween = async (req: Request, res: Response) => {
               Change_per_second: "$Change_per_second",
             },
           },
+          max_change_per_second: { $max: "$Change_per_second" },
+          min_change_per_second: { $min: "$Change_per_second" },
+          avg_change_per_second: { $avg: "$Change_per_second" },
         },
       },
       {
@@ -190,6 +193,9 @@ export const getBetween = async (req: Request, res: Response) => {
             $push: {
               item_id: "$_id.item_id",
               item_type: "$_id.item_type",
+              max_change_per_second: "$max_change_per_second",
+              min_change_per_second: "$min_change_per_second",
+              avg_change_per_second: "$avg_change_per_second",
               data: "$data",
             },
           },
