@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IItem extends Document {
+  _id: mongoose.Types.ObjectId;
   host_id: mongoose.Types.ObjectId;
   item_name: string;
   oid: string;
