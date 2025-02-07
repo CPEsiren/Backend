@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  getAction,
+  getActionById,
   getActions,
   createAction,
   updateAction,
@@ -10,7 +10,7 @@ import {
 const router = express.Router();
 
 router.get("/", getActions);
-router.get("/:id", getAction);
+router.get("/:id", getActionById);
 router.post("/", createAction);
 router.put("/:id", updateAction);
 router.delete("/:id", deleteAction);
