@@ -1,51 +1,40 @@
-import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Action from "../models/Action";
 
-const getAction = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+const getActionById = async (
+  request: Request,
+  response: Response
+): Promise<void> => {
+  const { id } = request.params;
 
+  try {
+    console.log(`Attempting to find action with id ${id}`);
     const action = await Action.findById(id).populate("triggerId mediaId");
+
     if (!action) {
-      await addLog("WARNNING", `Action with id ${id} not found`, false);
-      return res.status(404).json({ message: "Action not found" });
+      console.log(`Action not found with id ${id}`);
+      response.status(404).json({ message: "Action not found" });
+      return;
     }
 
-    res.status(200).json(action);
+    console.log(`Found action with id ${id}`);
+    response.status(200).json(action);
   } catch (error) {
-    await addLog("ERROR", `Error retrieving action: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.log(`Error finding action with id ${id}: ${error}`);
+    response.status(500).json({ message: "Internal server error" });
   }
 };
 
 const getActions = async (req: Request, res: Response) => {
   try {
-    const { media_id, enabled, limit = 10, page = 1 } = req.query;
+    const actions = await Action.find();
+    const total = await Action.countDocuments();
 
-    const query: any = {};
-    if (media_id) query.media_id = media_id;
-    if (enabled !== undefined) query.enabled = enabled === "true";
-
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const actions = await Action.find(query)
-      // .populate("media_id")
-      .sort({ name: 1 })
-      .skip(skip)
-      .limit(Number(limit));
-
-    const total = await Action.countDocuments(query);
-
-    await addLog("INFO", `Fetched ${actions.length} actions`, false);
     res.status(200).json({
       actions,
       total,
-      page: Number(page),
-      pages: Math.ceil(total / Number(limit)),
     });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving actions: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -60,11 +49,7 @@ const createAction = async (req: Request, res: Response) => {
     if (!action_name || !media_id || !messageTemplate) {
       await session.abortTransaction();
       session.endSession();
-      await addLog(
-        "WARNING",
-        `Missing required fields for creating action ${action_name}`,
-        false
-      );
+
       return res.status(400).json({ message: "Missing required fields" });
     }
 
@@ -80,8 +65,6 @@ const createAction = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
-    await addLog("INFO", `Action ${action_name} created successfully`, true);
-
     res.status(201).json({
       message: "Action created successfully",
       action: newAction,
@@ -90,7 +73,6 @@ const createAction = async (req: Request, res: Response) => {
     await session.abortTransaction();
     session.endSession();
     console.error("Error creating action:", error);
-    await addLog("ERROR", `Error creating action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -107,7 +89,6 @@ const updateAction = async (req: Request, res: Response) => {
     if (!action) {
       await session.abortTransaction();
       session.endSession();
-      await addLog("WARNING", `Action with id ${id} not found`, false);
       return res.status(404).json({ message: "Action not found" });
     }
 
@@ -120,11 +101,7 @@ const updateAction = async (req: Request, res: Response) => {
 
     await session.commitTransaction();
     session.endSession();
-    await addLog(
-      "INFO",
-      `Action ${action.action_name} updated successfully`,
-      true
-    );
+
     res.status(200).json({
       message: "Action updated successfully",
       action,
@@ -132,7 +109,6 @@ const updateAction = async (req: Request, res: Response) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    await addLog("ERROR", `Error updating action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -148,18 +124,12 @@ const deleteAction = async (req: Request, res: Response) => {
     if (!action) {
       await session.abortTransaction();
       session.endSession();
-      await addLog("WARNING", `Action with id ${id} not found`, false);
       return res.status(404).json({ message: "Action not found" });
     }
 
     await session.commitTransaction();
     session.endSession();
 
-    await addLog(
-      "INFO",
-      `Action [${action.action_name}] deleted successfully`,
-      true
-    );
     res
       .status(200)
       .json({ message: `Action ${action.action_name} deleted successfully` });
@@ -167,9 +137,8 @@ const deleteAction = async (req: Request, res: Response) => {
     await session.abortTransaction();
     session.endSession();
 
-    await addLog("ERROR", `Error deleting action: ${error}`, false);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export { getAction, getActions, createAction, updateAction, deleteAction };
+export { getActionById, getActions, createAction, updateAction, deleteAction };
