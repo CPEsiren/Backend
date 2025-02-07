@@ -1,4 +1,3 @@
-import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Template from "../models/Template";
 import mongoose from "mongoose";
@@ -8,21 +7,18 @@ export const getAllTemplate = async (req: Request, res: Response) => {
     const template = await Template.find().lean().exec();
 
     if (!template.length) {
-      await addLog("WARNING", "No template found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No template found.",
       });
     }
 
-    await addLog("INFO", "Template fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Template fetched successfully.",
       data: template,
     });
   } catch (err) {
-    await addLog("ERROR", "Error fetching template.", false);
     res.status(500).json({
       status: "error",
       message: "Error fetching template.",
@@ -39,7 +35,6 @@ export const createTemplate = async (req: Request, res: Response) => {
     const { template_name, items, description } = req.body;
 
     if (!template_name || !description) {
-      await addLog("WARNING", "Missing required fields.", false);
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
@@ -58,11 +53,6 @@ export const createTemplate = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
-    await addLog(
-      "INFO",
-      `Template [${newTemplate.template_name}] created successfully.`,
-      true
-    );
     res.status(201).json({
       status: "success",
       message: `Template [${newTemplate.template_name}] created successfully.`,
@@ -70,7 +60,6 @@ export const createTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    await addLog("ERROR", "Error creating template.", false);
     res.status(500).json({
       status: "error",
       message: "Error creating template.",
@@ -84,7 +73,6 @@ export const updateTemplate = async (req: Request, res: Response) => {
     const template_id = req.params.id;
 
     if (!template_id) {
-      await addLog("WARNING", "Invalid template ID.", false);
       return res.status(400).json({
         status: "fail",
         message: "template ID is required to update an template.",
@@ -110,11 +98,6 @@ export const updateTemplate = async (req: Request, res: Response) => {
 
       const template = await Template.findById(updatedItem._id);
 
-      await addLog(
-        "INFO",
-        `Template with ID: [${updatedItem.template_name}] of host [${template?.template_name}] updated successfully.`,
-        true
-      );
       res.status(200).json({
         status: "success",
         message: `Template with ID: [${updatedItem.template_name}] of template [${template?.template_name}] updated successfully.`,
@@ -126,7 +109,6 @@ export const updateTemplate = async (req: Request, res: Response) => {
       throw error;
     }
   } catch (error) {
-    await addLog("ERROR", `Failed to update template: ${error}`, false);
     res.status(500).json({
       status: "error",
       message: "Failed to update template.",
@@ -143,7 +125,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
     const templateId = req.params.id;
 
     if (!templateId || !mongoose.Types.ObjectId.isValid(templateId)) {
-      await addLog("WARNING", "Invalid template ID.", false);
       return res.status(400).json({
         status: "fail",
         message: "Valid template ID is required.",
@@ -156,7 +137,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
 
     if (!deletedTemplate) {
       await session.abortTransaction();
-      await addLog("WARNING", "Template not found.", false);
       return res.status(404).json({
         status: "fail",
         message: "Template not found.",
@@ -166,11 +146,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
-    await addLog(
-      "INFO",
-      `Template [${deletedTemplate.template_name}] deleted successfully.`,
-      true
-    );
     res.status(200).json({
       status: "success",
       message: "Template deleted successfully.",
@@ -178,7 +153,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    await addLog("ERROR", "Error deleting template.", false);
     res.status(500).json({
       status: "error",
       message: "Error deleting template.",
