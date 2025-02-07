@@ -1,10 +1,9 @@
 import { hasTrigger, sendNotification } from "./alertService";
-import Action, { IAction } from "../models/Action";
-import { addLog, createTime } from "../middleware/log";
-import Host, { IHost } from "../models/Host";
+import Action from "../models/Action";
+import { createTime } from "../middleware/log";
+import Host from "../models/Host";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";
-import Trigger from "../models/Trigger";
 import Event from "../models/Event";
 import Media from "../models/Media";
 import mongoose from "mongoose";
@@ -48,22 +47,12 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
       // Process the result
       if (snmp.isVarbindError(result)) {
-        await addLog(
-          "ERROR",
-          `Error fetching OID ${item.oid}: ${snmp.varbindError(result)}`,
-          false
-        );
         return;
       }
 
       // Get the current value
       const currentValue = parseFloat(result.value.toString());
       const currentTimestamp = new Date(await createTime());
-      await addLog(
-        "INFO",
-        `[${item.item_name}] currentValue: ${currentValue}, currentTimestamp: ${currentTimestamp}`,
-        false
-      );
 
       // Find the latest data for this item
       const latestData = await Data.findOne({
@@ -77,32 +66,17 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       if (latestData) {
         const previousValue = latestData.value;
         const previousTimestamp = new Date(latestData.timestamp as Date);
-        await addLog(
-          "INFO",
-          `[${item.item_name}] previousValue: ${previousValue}, previousTimestamp: ${previousTimestamp}`,
-          false
-        );
 
         deltaValue = currentValue - previousValue;
 
         const timeDifferenceInSeconds =
           (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
         changePerSecond = deltaValue / timeDifferenceInSeconds;
-        await addLog(
-          "INFO",
-          `[${item.item_name}] deltaValue: ${deltaValue}, timeDifferenceInSeconds: ${timeDifferenceInSeconds}`,
-          false
-        );
 
         if (
           item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
           item.oid.includes("1.3.6.1.2.1.2.2.1.16")
         ) {
-          await addLog(
-            "INFO",
-            `[${item.item_name}] calculate bandwidth......`,
-            false
-          );
           let index = 0;
 
           if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
@@ -115,11 +89,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           );
 
           if (!ifspeed) {
-            await addLog(
-              "ERROR",
-              `[${item.item_name}] Interface with index ${index} not found`,
-              false
-            );
             return;
           }
 
@@ -127,11 +96,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           const down =
             timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
           const bandwidthUtilization = up / down;
-          await addLog(
-            "INFO",
-            `[${item.item_name}] bandwidthUtilization: ${up}/${down} = ${bandwidthUtilization}`,
-            false
-          );
+
           const itembandwidth = await Item.findOne({
             host_id: host._id,
             oid: item.oid,
@@ -152,16 +117,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               expireAfterSeconds: 10,
             });
             await bandwidthData.save();
-            await checkAndHandleTriggers(
-              itembandwidth,
-              host,
-              bandwidthData.Change_per_second
-            );
-
-            await addLog(
-              "INFO",
-              `[${item.item_name}] Fetch Data for bandwidth.`,
-              false
+            await hasTrigger(
+              host._id as mongoose.Types.ObjectId,
+              itembandwidth._id as mongoose.Types.ObjectId,
+              itembandwidth.item_name,
+              changePerSecond
             );
           }
         }
@@ -186,15 +146,13 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       host.status = 1;
       await host.save();
 
-      await addLog("INFO", `[${item.item_name}] Fetch Data.`, false);
-
-      await checkAndHandleTriggers(item, host, changePerSecond);
-    } catch (error) {
-      await addLog(
-        "ERROR",
-        `Error in fetchAndStoreSnmpDataForItem for item ${item.item_name} of host ${item.host_id}: ${error}`,
-        false
+      await hasTrigger(
+        host._id as mongoose.Types.ObjectId,
+        item._id as mongoose.Types.ObjectId,
+        item.item_name,
+        changePerSecond
       );
+    } catch (error) {
       item.status = 0;
       await item.save();
       if (
@@ -221,11 +179,6 @@ export async function checkSnmpConnection(host_id: string): Promise<void> {
     // Find the host by ID
     const host = await Host.findById(host_id);
     if (!host) {
-      await addLog(
-        "WARNING",
-        `[checkSnmpConnection] Host not found for ID: ${host_id}`,
-        false
-      );
       return;
     }
 
@@ -255,11 +208,6 @@ export async function checkSnmpConnection(host_id: string): Promise<void> {
       });
     });
   } catch (error) {
-    await addLog(
-      "ERROR",
-      `[checkSnmpConnection] Error checking SNMP connection for host ${host_id}: ${error}`,
-      false
-    );
     // Update the host with error status
     await Host.findByIdAndUpdate(host_id, {
       status: 0,
@@ -608,18 +556,9 @@ export async function fetchDetailHost(
         details[key] = varbind.value.toString();
       }
     });
-    await addLog(
-      "INFO",
-      `Fetching system details for ${ip_address} with community ${snmp_community}`,
-      false
-    );
+
     return { interfaces, details, status: 1 };
   } catch (error) {
-    await addLog(
-      "ERROR",
-      `Error in fetchDetailHost for host ${ip_address}: ${error}`,
-      false
-    );
     return { interfaces: [], details: {}, status: 0 };
   }
 }
@@ -709,14 +648,8 @@ export async function fetchInterfaceHost(
         }
       }
     }
-    await addLog("INFO", `Fetching interface details for ${ip_address}`, false);
     return interfaceItems;
   } catch (error) {
-    await addLog(
-      "ERROR",
-      `Error in fetchInterfaceHost for host ${ip_address}: ${error}`,
-      false
-    );
     throw error;
   } finally {
     session.close();
@@ -733,56 +666,56 @@ function getSnmpVersion(version: string): number {
   return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
 }
 
-async function checkAndHandleTriggers(
-  item: IItem,
-  host: IHost,
-  changePerSecond: number
-) {
-  // Check if there is a trigger for this item
-  const triggers = await hasTrigger(
-    changePerSecond,
-    host._id as mongoose.Types.ObjectId,
-    item._id as mongoose.Types.ObjectId
-  );
+// async function checkAndHandleTriggers(
+//   item: IItem,
+//   host: IHost,
+//   changePerSecond: number
+// ) {
+//   // Check if there is a trigger for this item
+//   const triggers = await hasTrigger(
+//     changePerSecond,
+//     host._id as mongoose.Types.ObjectId,
+//     item._id as mongoose.Types.ObjectId
+//   );
 
-  if (triggers.triggered) {
-    await handleTriggeredEvent(triggers, item, host, changePerSecond);
-  } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
-    await resolveExistingProblems(triggers.triggeredIds);
-  }
-}
+//   if (triggers.triggered) {
+//     await handleTriggeredEvent(triggers, item, host, changePerSecond);
+//   } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
+//     await resolveExistingProblems(triggers.triggeredIds);
+//   }
+// }
 
-async function handleTriggeredEvent(
-  triggers: any,
-  item: IItem,
-  host: IHost,
-  changePerSecond: number
-) {
-  const trigger = await Trigger.findById(triggers.triggeredIds[0]);
-  const lastEvent = await Event.findOne({
-    trigger_id: triggers.triggeredIds[0],
-    status: "PROBLEM",
-  });
+// async function handleTriggeredEvent(
+//   triggers: any,
+//   item: IItem,
+//   host: IHost,
+//   changePerSecond: number
+// ) {
+//   const trigger = await Trigger.findById(triggers.triggeredIds[0]);
+//   const lastEvent = await Event.findOne({
+//     trigger_id: triggers.triggeredIds[0],
+//     status: "PROBLEM",
+//   });
 
-  if (!lastEvent) {
-    const message = ` ${triggers.highestSeverity?.toLocaleUpperCase()} with item ${
-      item.item_name
-    } of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${
-      trigger?.ComparisonOperator
-    } ${trigger?.valuetrigger} ${item.unit}/s.`;
-    const newEvent = new Event({
-      trigger_id: triggers.triggeredIds[0],
-      hostname: host.hostname,
-      status: "PROBLEM",
-      message: message,
-    });
-    await newEvent.save();
-    await addLog("INFO", `Event created: ${newEvent.message}`, false);
+//   if (!lastEvent) {
+//     const message = ` ${triggers.highestSeverity?.toLocaleUpperCase()} with item ${
+//       item.item_name
+//     } of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${
+//       trigger?.ComparisonOperator
+//     } ${trigger?.valuetrigger} ${item.unit}/s.`;
+//     const newEvent = new Event({
+//       trigger_id: triggers.triggeredIds[0],
+//       hostname: host.hostname,
+//       status: "PROBLEM",
+//       message: message,
+//     });
+//     await newEvent.save();
+//     await addLog("INFO", `Event created: ${newEvent.message}`, false);
 
-    // Send notifications for the new event
-    await sendNotifications(message, "Problem: ");
-  }
-}
+//     // Send notifications for the new event
+//     await sendNotifications(message, "Problem: ");
+//   }
+// }
 
 async function resolveExistingProblems(
   triggeredIds: mongoose.Types.ObjectId[]
@@ -795,7 +728,6 @@ async function resolveExistingProblems(
     );
 
     if (activeEvent) {
-      await addLog("INFO", `Event resolved: ${activeEvent.message}`, false);
       await sendNotifications(activeEvent.message, "Resolved: ");
     }
   });
@@ -809,12 +741,6 @@ async function sendNotifications(message: string, prefix: string) {
     const media = await Media.findById(action.media_id);
     if (media) {
       await sendNotification(media, action.messageTemplate, prefix + message);
-    } else {
-      await addLog(
-        "WARNING",
-        `Media not found for action ${action._id}`,
-        false
-      );
     }
   });
 }
