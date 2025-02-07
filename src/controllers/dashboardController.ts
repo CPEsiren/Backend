@@ -3,7 +3,6 @@ import Item from "../models/Item";
 import Trigger from "../models/Trigger";
 import Event from "../models/Event";
 import { User } from "../models/User";
-import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Template from "../models/Template";
 
@@ -73,8 +72,6 @@ export async function getDashboardCounts(req: Request, res: Response) {
 
     res.status(200).json(counts);
   } catch (error) {
-    console.error("Error fetching dashboard counts:", error);
-    await addLog("Error", "Failed to fetch dashboard counts", false);
     res.status(500).json({ error: "Failed to fetch dashboard counts" });
   }
 }
