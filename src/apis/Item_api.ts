@@ -7,9 +7,11 @@ import {
   updateItem,
 } from "../controllers/itemController";
 
+import { auth } from "../middleware/auth";
+
 const router = Router();
 
-router.get("/", getAllItem);
+router.get("/", auth, getAllItem);
 
 router.post("/", createItem);
 
