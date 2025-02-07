@@ -1,5 +1,4 @@
 import { fetchAndStoreSnmpDataForItem } from "./snmpService";
-import { addLog } from "../middleware/log";
 import Item from "../models/Item";
 import Data from "../models/Data";
 import Trend from "../models/Trend";
@@ -25,13 +24,7 @@ export function scheduleItem(item: any) {
   schedules[item._id] = setInterval(async () => {
     try {
       await fetchAndStoreSnmpDataForItem(item);
-    } catch (error) {
-      await addLog(
-        "ERROR",
-        `Error fetching data for item ${item._id}: ${error}`,
-        true
-      );
-    }
+    } catch (error) {}
   }, item.interval * 1000);
 }
 
@@ -95,9 +88,5 @@ async function summarizeDataToTrend() {
         value_avg: result.averageValue,
       });
     }
-
-    await addLog("INFO", "Hourly data summarization completed", true);
-  } catch (error) {
-    await addLog("ERROR", `Error in hourly data summarization: ${error}`, true);
-  }
+  } catch (error) {}
 }
