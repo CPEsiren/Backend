@@ -3,10 +3,21 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface ITrigger extends Document {
   trigger_name: string;
   host_id: mongoose.Types.ObjectId;
-  item_id: mongoose.Types.ObjectId;
-  ComparisonOperator: string;
-  valuetrigger: number;
-  severity: "warning" | "critical";
+  severity:
+    | "not classified"
+    | "information"
+    | "warning"
+    | "average"
+    | "high"
+    | "disaster";
+  expression: string;
+  logicExpression: string[];
+  isExpressionValid: boolean;
+  items: [string, mongoose.Types.ObjectId][];
+  ok_event_generation: "expression" | "recovery expression" | "none";
+  recovery_expression: string;
+  logicRecoveryExpression: string[];
+  isRecoveryExpressionValid: boolean;
   enabled: boolean;
   createdAt: Date;
 }
@@ -23,24 +34,49 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       ref: "Host",
       required: true,
     },
-    item_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Item",
-      required: true,
-    },
-    ComparisonOperator: {
-      type: String,
-      required: true,
-      enum: ["<", "<=", "=", ">=", ">", "!="], // Add valid operators
-    },
-    valuetrigger: {
-      type: Number,
-      required: true,
-    },
     severity: {
       type: String,
-      enum: ["warning", "critical"],
+      enum: [
+        "not classified",
+        "information",
+        "warning",
+        "average",
+        "high",
+        "disaster",
+      ],
       required: true,
+    },
+    expression: {
+      type: String,
+      required: true,
+    },
+    logicExpression: {
+      type: [String],
+      default: [],
+    },
+    isExpressionValid: {
+      type: Boolean,
+      default: false,
+    },
+    items: {
+      type: [[String, Schema.Types.ObjectId]],
+      default: [],
+    },
+    ok_event_generation: {
+      type: String,
+      enum: ["expression", "recovery expression", "none"],
+      required: true,
+    },
+    recovery_expression: {
+      type: String,
+    },
+    logicRecoveryExpression: {
+      type: [String],
+      default: [],
+    },
+    isRecoveryExpressionValid: {
+      type: Boolean,
+      default: true,
     },
     enabled: {
       type: Boolean,
@@ -51,9 +87,5 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
     timestamps: { createdAt: true, updatedAt: false },
   }
 );
-
-// Compound indexes for efficient querying
-TriggerSchema.index({ name: 1, severity: 1 });
-TriggerSchema.index({ host_id: 1, item_id: 1 });
 
 export default mongoose.model<ITrigger>("Trigger", TriggerSchema);
