@@ -1,4 +1,3 @@
-import { addLog } from "../middleware/log";
 import { Request, Response } from "express";
 import Data from "../models/Data";
 import mongoose from "mongoose";
@@ -50,21 +49,18 @@ export const getAllData = async (req: Request, res: Response) => {
     });
 
     if (!data.length) {
-      await addLog("WARNING", "No data found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No data found.",
       });
     }
 
-    await addLog("INFO", "Data fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully.",
       data: data,
     });
   } catch (err) {
-    await addLog("ERROR", `Error fetching data: ${err}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching data.",
@@ -122,21 +118,18 @@ export const getData = async (req: Request, res: Response) => {
     });
 
     if (!data.length) {
-      await addLog("WARNING", "No data found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No data found.",
       });
     }
 
-    await addLog("INFO", "Data fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully.",
       data: data,
     });
   } catch (err) {
-    await addLog("ERROR", `Error fetching data: ${err}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching data.",
@@ -216,11 +209,6 @@ export const getBetween = async (req: Request, res: Response) => {
     });
 
     if (!data.length) {
-      await addLog(
-        "WARNING",
-        "No data found between the specified times.",
-        false
-      );
       return res.status(404).json({
         status: "fail",
         message: "No data found between the specified times.",
@@ -228,18 +216,12 @@ export const getBetween = async (req: Request, res: Response) => {
       });
     }
 
-    await addLog(
-      "INFO",
-      "Data fetched successfully for the specified time range.",
-      false
-    );
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully for the specified time range.",
       data: data,
     });
   } catch (err) {
-    await addLog("ERROR", `Error fetching data between times: ${err}`, false);
     res.status(500).json({
       status: "error",
       message: "Error fetching data between times.",
