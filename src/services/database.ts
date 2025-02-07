@@ -1,4 +1,3 @@
-import { addLog } from "../middleware/log";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
@@ -8,11 +7,6 @@ const url = process.env.DATABASE_URL;
 
 export const connectDb = async (): Promise<void> => {
   if (!url) {
-    await addLog(
-      "ERROR",
-      "DATABASE_URL is not defined in the environment variables",
-      false
-    );
     throw new Error("DATABASE_URL is not defined in the environment variables");
   }
 
@@ -20,7 +14,6 @@ export const connectDb = async (): Promise<void> => {
     await mongoose.connect(url, {
       dbName: "CPE-Siren", // Specify the database name here
     });
-    await addLog("INFO", "MongoDB connected successfully.", false);
     console.log("MongoDB connected successfully.");
   } catch (error) {
     throw error;
