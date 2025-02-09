@@ -1,4 +1,8 @@
-import { clearSchedule, scheduleItem } from "../services/schedulerService";
+import {
+  clearSchedule,
+  scheduleItem,
+  setupSchedules,
+} from "../services/schedulerService";
 import { fetchInterfaceHost } from "../services/snmpService";
 import { Request, Response } from "express";
 import Item from "../models/Item";
@@ -197,6 +201,8 @@ export const updateItem = async (req: Request, res: Response) => {
       session.endSession();
 
       const host = await Host.findById(updatedItem.host_id);
+
+      await setupSchedules();
 
       res.status(200).json({
         status: "success",
