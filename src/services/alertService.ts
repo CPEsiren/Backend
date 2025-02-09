@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { parseExpressionDetailed } from "./parserService";
 import Host from "../models/Host";
 import Event from "../models/Event";
+import Data from "../models/Data";
 
 interface TriggerResult {
   triggered: boolean;
@@ -41,18 +42,19 @@ export async function hasTrigger(
       const parsedExpression = parseExpressionDetailed(trigger.expression);
 
       // Find the position of item_name in the parsed expression
-      const itemPosition = parsedExpression.findIndex(
-        (group) => group[0] === item_name
+      const itemPosition = parsedExpression.findIndex((group) =>
+        group[0].includes(item_name)
       );
 
       const oldLogicExpression = trigger.logicExpression[itemPosition];
       const oldIsExpressionValid = trigger.isExpressionValid;
 
       if (itemPosition !== -1) {
-        const isTriggered = evaluateLogic(
+        const isTriggered = await evaluateLogic(
           parsedExpression,
           itemPosition,
-          value
+          item_id,
+          host_id
         );
 
         trigger.logicExpression[itemPosition] = isTriggered ? "true" : "false";
@@ -78,10 +80,11 @@ export async function hasTrigger(
         const oldIsRecoveryExpressionValid = trigger.isRecoveryExpressionValid;
 
         if (itemPosition !== -1) {
-          const isTriggered = evaluateLogic(
+          const isTriggered = await evaluateLogic(
             parsedRecoveryExpression,
             itemPosition,
-            value
+            item_id,
+            host_id
           );
 
           trigger.logicRecoveryExpression[itemPosition] = isTriggered
@@ -158,18 +161,140 @@ export async function hasTrigger(
   }
 }
 
-function evaluateLogic(
+export async function evaluateLogic(
   parsedExpression: (string | string[])[],
   itemPosition: number,
-  value: number
-): boolean {
+  item_id: mongoose.Types.ObjectId,
+  host_id: mongoose.Types.ObjectId
+): Promise<boolean> {
   const group = parsedExpression[itemPosition];
   if (group.length !== 3) {
     return false; // Invalid expression format
   }
 
-  const [item, operator, threshold] = group;
+  const [rawItem, operator, threshold] = group;
   const numericThreshold = parseFloat(threshold);
+
+  // Parse the item name to extract function, name_item, and duration
+  const itemMatch = rawItem.match(
+    /(avg|min|max|last)\((.*?)(?:,\s*(\d+[mhd]))?\)/
+  );
+  if (!itemMatch) {
+    return false; // Invalid item format
+  }
+
+  const [, func, name_item, duration = "15m"] = itemMatch;
+
+  let value: number = 0;
+
+  let range = 15 * 60 * 1000; // Default to 15 minutes in milliseconds
+  if (duration.endsWith("m")) {
+    range = parseInt(duration) * 60 * 1000;
+  } else if (duration.endsWith("h")) {
+    range = parseInt(duration) * 60 * 60 * 1000;
+  } else if (duration.endsWith("d")) {
+    range = parseInt(duration) * 24 * 60 * 60 * 1000;
+  }
+
+  const endTime = new Date();
+  const startTime = new Date(endTime.getTime() - range);
+
+  if (func === "last") {
+    const datas = await Data.findOne(
+      { metadata: { host_id: host_id, item_id: item_id } },
+      {},
+      { sort: { timestamp: -1 } }
+    );
+    if (datas) {
+      value = datas.Change_per_second;
+    }
+  } else if (func === "avg") {
+    const data = await Data.aggregate([
+      {
+        $match: {
+          "metadata.host_id": host_id,
+          "metadata.item_id": item_id,
+          timestamp: { $gte: startTime, $lte: endTime },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            host_id: "$metadata.host_id",
+            item_id: "$metadata.item_id",
+          },
+          averageValue: { $avg: "$Change_per_second" },
+        },
+      },
+    ]);
+
+    if (data.length > 0) {
+      value = data[0].averageValue;
+    } else {
+      console.log(
+        "No data found for the given host_id, item_id, and time range"
+      );
+      return false;
+    }
+  } else if (func === "min") {
+    const data = await Data.aggregate([
+      {
+        $match: {
+          "metadata.host_id": host_id,
+          "metadata.item_id": item_id,
+          timestamp: { $gte: startTime, $lte: endTime },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            host_id: "$metadata.host_id",
+            item_id: "$metadata.item_id",
+          },
+          minValue: { $min: "$Change_per_second" },
+        },
+      },
+    ]);
+
+    if (data.length > 0) {
+      value = data[0].minValue;
+    } else {
+      console.log(
+        "No data found for the given host_id, item_id, and time range"
+      );
+      return false;
+    }
+  } else if (func === "max") {
+    const data = await Data.aggregate([
+      {
+        $match: {
+          "metadata.host_id": host_id,
+          "metadata.item_id": item_id,
+          timestamp: { $gte: startTime, $lte: endTime },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            host_id: "$metadata.host_id",
+            item_id: "$metadata.item_id",
+          },
+          maxValue: { $max: "$Change_per_second" },
+        },
+      },
+    ]);
+
+    if (data.length > 0) {
+      value = data[0].maxValue;
+    } else {
+      console.log(
+        "No data found for the given host_id, item_id, and time range"
+      );
+      return false;
+    }
+  } else {
+    console.log("Invalid function name");
+  }
 
   switch (operator) {
     case ">":
