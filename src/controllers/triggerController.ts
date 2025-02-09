@@ -168,12 +168,57 @@ const updateTrigger = async (req: Request, res: Response) => {
       enabled,
     } = req.body;
 
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const addedItemNames = new Set<string>();
+
+    //parse expression
+    const parsedItemsExp = new Set(parseExpressionToItems(expression));
+    const logicExpression = parseExpressionDetailed(expression).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
+      }
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+    if (recovery_expression) {
+      const parsedRecoveryItems = parseExpressionToItems(recovery_expression);
+      parsedRecoveryItems.forEach((item) => parsedItemsExp.add(item));
+    }
+
+    if (parsedItemsExp.size === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid expression format",
+      });
+    }
+
+    const logicRecoveryExpression = parseExpressionDetailed(
+      recovery_expression
+    ).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
+      }
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+
+    for (const itemName of parsedItemsExp) {
+      if (!addedItemNames.has(itemName)) {
+        const item = await Item.findOne({ item_name: itemName });
+        if (item) {
+          items.push([itemName, item._id]);
+          addedItemNames.add(itemName);
+        }
+      }
+    }
+
     const trigger = await Trigger.findByIdAndUpdate(id, {
       trigger_name,
       severity,
       expression,
-      recovery_expression,
+      logicExpression,
+      items,
       ok_event_generation,
+      recovery_expression,
+      logicRecoveryExpression,
       enabled,
     });
 
