@@ -164,7 +164,6 @@ export const getBetween = async (req: Request, res: Response) => {
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
-            item_type: "$metadata.item_type",
           },
           data: {
             $push: {
