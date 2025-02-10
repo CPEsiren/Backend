@@ -5,6 +5,7 @@ import Event from "../models/Event";
 import { User } from "../models/User";
 import { Request, Response } from "express";
 import Template from "../models/Template";
+import Dashboard from "../models/Dashboard";
 
 export async function getDashboardCounts(req: Request, res: Response) {
   try {
@@ -73,5 +74,100 @@ export async function getDashboardCounts(req: Request, res: Response) {
     res.status(200).json(counts);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch dashboard counts" });
+  }
+}
+
+export async function getDashboards(req: Request, res: Response) {
+  try {
+    const dashboards = await Dashboard.find();
+
+    if (!dashboards) {
+      return res
+        .status(404)
+        .json({ status: "fail", error: "No dashboards found" });
+    }
+
+    res.status(200).json({ status: "success", dashboards });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: "Failed to fetch dashboards" });
+  }
+}
+
+export async function createDashboard(req: Request, res: Response) {
+  try {
+    const { dashboard_name, widget, isAdmin } = req.body;
+
+    const requiredFields = ["dashboard_name", "widget", "isAdmin"];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: missingFields,
+      });
+    }
+
+    const newDashboard = new Dashboard({
+      dashboard_name,
+      widget,
+      isAdmin,
+    });
+
+    const savedDashboard = await newDashboard.save();
+
+    res.status(201).json({ status: "success", savedDashboard });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: `Failed to create dashboard: ${error}` });
+  }
+}
+
+export async function updateDashboard(req: Request, res: Response) {
+  try {
+    const { dashboard_name, widget, isAdmin } = req.body;
+
+    const dashboard = await Dashboard.findByIdAndUpdate(req.params.id, {
+      dashboard_name,
+      widget,
+      isAdmin,
+    });
+
+    if (!dashboard) {
+      return res
+        .status(404)
+        .json({ status: "fail", error: "Dashboard not found" });
+    }
+
+    const newDashboard = await Dashboard.findById(req.params.id);
+
+    res.status(200).json({ status: "success", newDashboard });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: `Failed to update dashboard: ${error}` });
+  }
+}
+
+export async function deleteDashboard(req: Request, res: Response) {
+  try {
+    const dashboard = await Dashboard.findByIdAndDelete(req.params.id);
+
+    if (!dashboard) {
+      return res
+        .status(404)
+        .json({ status: "fail", error: "Dashboard not found" });
+    }
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Dashboard deleted", dashboard });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: `Failed to delete dashboard: ${error}` });
   }
 }
