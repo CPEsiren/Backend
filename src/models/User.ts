@@ -4,7 +4,7 @@ export interface IUser extends Document {
   username: string;
   email: string;
   picture?: string;
-  role: "admin" | "operator" | "viewer";
+  role: "admin" | "viewer";
   createdAt: Date;
   isActive: boolean;
   token: string;
