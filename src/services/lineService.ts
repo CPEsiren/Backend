@@ -1,4 +1,3 @@
-import { addLog } from "../middleware/log";
 import dotenv from "dotenv";
 import axios from "axios";
 
@@ -17,20 +16,10 @@ export async function sendLine(userId: string, message: string): Promise<void> {
       to: userId,
       messages: [{ type: "text", text: message }],
     };
-    console.log(headers);
-    const response = await axios.post(LINE_BOT_API, requestBody, { headers });
-    await addLog("INFO", `Message sent successfully: ${response.data}`, false);
+    await axios.post(LINE_BOT_API, requestBody, { headers });
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      await addLog(
-        "ERROR",
-        `Error sending message via LINE API: ${error.message}, Status: ${
-          error.response.status
-        }, Data: ${JSON.stringify(error.response.data)}`,
-        false
-      );
     } else {
-      await addLog("ERROR", `Unexpected error: ${error}`, false);
     }
   }
 }
