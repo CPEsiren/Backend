@@ -30,7 +30,11 @@ export const loginUser = async (req: Request, res: Response) => {
 
     res.status(201).json({
       message: `User [${savedUser.username}] logged in successfully`,
-      user: savedUser,
+      user: {
+        _id: savedUser._id,
+        email: savedUser.email,
+        role: savedUser.role,
+      },
     });
   } catch (error) {
     res.status(400).json({ error: "Invalid token" });
