@@ -37,6 +37,28 @@ const getUsers = async (req: Request, res: Response) => {
   }
 };
 
+const getRole = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: "warning", message: "User not found" });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "User role retrieved successfully",
+      role: user.role,
+    });
+  } catch (error) {
+    res.status(500).json({ status: "fail", message: "Internal server error" });
+  }
+};
+
 const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -54,4 +76,4 @@ const deleteUser = async (req: Request, res: Response) => {
   }
 };
 
-export { getUser, getUsers, deleteUser };
+export { getUser, getUsers, getRole, deleteUser };
