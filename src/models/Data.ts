@@ -2,19 +2,19 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IData extends Document {
   value: number;
-  Change_per_second: number;
+  current_value: number;
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
     item_id: mongoose.Types.ObjectId;
-    item_type: string;
+    isBandwidth: boolean;
   };
 }
 
 const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: Number, required: true },
-    Change_per_second: { type: Number, required: true },
+    current_value: { type: Number, required: true },
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
@@ -27,7 +27,7 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
         ref: "Item",
         required: true,
       },
-      item_type: { type: String },
+      isBandwidth: { type: Boolean, required: true },
     },
   },
   {
