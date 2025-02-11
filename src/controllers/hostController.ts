@@ -125,36 +125,9 @@ export const createHost = async (req: Request, res: Response) => {
 
     let itemDocuments: any[] = [];
 
-    const incomingBandwidthItems =
-      newHost?.interfaces.map((iface, index) => ({
-        host_id: newHost._id,
-        item_name: `${iface.interface_name} Incoming Bandwidth Utilization`,
-        oid: `1.3.6.1.2.1.2.2.1.10.${iface.interface_index}`,
-        type: "bandwidth",
-        unit: "%",
-        isBandwidth: true,
-      })) ?? [];
-
-    const outgoingBandwidthItems =
-      newHost?.interfaces.map((iface, index) => ({
-        host_id: newHost._id,
-        item_name: `${iface.interface_name} Outgoing Bandwidth Utilization`,
-        oid: `1.3.6.1.2.1.2.2.1.16.${iface.interface_index}`,
-        type: "bandwidth",
-        unit: "%",
-        isBandwidth: true,
-      })) ?? [];
-
-    incomingBandwidthItems.forEach((item) => {
-      itemDocuments.push(item);
-    });
-
-    outgoingBandwidthItems.forEach((item) => {
-      itemDocuments.push(item);
-    });
-
     if (Array.isArray(items) && items.length > 0) {
       items.forEach((item: any) => {
+        item.type = item.type.toLocaleLowerCase();
         itemDocuments.push({
           ...item,
           host_id: newHost._id,
