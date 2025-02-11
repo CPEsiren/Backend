@@ -6,7 +6,7 @@ import Trend from "../models/Trend";
 const schedules: { [key: string]: NodeJS.Timeout } = {};
 
 export async function setupSchedules() {
-  const items = await Item.find();
+  const items = await Item.find({ status: 1 });
 
   for (const item of items) {
     scheduleItem(item);
@@ -24,7 +24,9 @@ export function scheduleItem(item: any) {
   schedules[item._id] = setInterval(async () => {
     try {
       await fetchAndStoreSnmpDataForItem(item);
-    } catch (error) {}
+    } catch (error) {
+      console.error(`Error fetching data for item ${item._id}:`, error);
+    }
   }, item.interval * 1000);
 }
 
