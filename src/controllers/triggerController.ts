@@ -126,6 +126,11 @@ const createTrigger = async (req: Request, res: Response) => {
         if (item) {
           items.push([itemName, item._id]);
           addedItemNames.add(itemName);
+        } else {
+          return res.status(400).json({
+            status: "fail",
+            message: `Item [${itemName}] not found`,
+          });
         }
       }
     }
