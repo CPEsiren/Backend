@@ -54,121 +54,141 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       const currentValue = parseFloat(result.value.toString());
       const currentTimestamp = new Date(await createTime());
 
-      // Find the latest data for this item
-      const latestData = await Data.findOne({
-        "metadata.item_id": item._id,
-        "metadata.host_id": host._id,
-      }).sort({ timestamp: -1 });
-
+      let value: number = 0;
       let deltaValue = 0;
-      let changePerSecond = 0;
+      let changePerSecond: number = 0;
 
-      if (latestData) {
-        const previousValue = latestData.value;
-        const previousTimestamp = new Date(latestData.timestamp as Date);
+      if (item.type.toLocaleLowerCase() === "counter") {
+        // Find the latest data for this item
+        const latestData = await Data.findOne({
+          "metadata.item_id": item._id,
+          "metadata.host_id": host._id,
+        }).sort({ timestamp: -1 });
 
-        deltaValue = currentValue - previousValue;
+        if (latestData) {
+          const previousValue = latestData.current_value;
+          const previousTimestamp = new Date(latestData.timestamp as Date);
 
-        const timeDifferenceInSeconds =
-          (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
-        changePerSecond = deltaValue / timeDifferenceInSeconds;
+          deltaValue = currentValue - previousValue;
 
-        if (
-          item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
-          item.oid.includes("1.3.6.1.2.1.2.2.1.16")
-        ) {
-          let index = 0;
+          const timeDifferenceInSeconds =
+            (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
+          console.log(timeDifferenceInSeconds);
 
-          if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
-            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", ""));
-          } else {
-            index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", ""));
-          }
-          const ifspeed = host.interfaces.find(
-            (iface) => iface.interface_index === index
-          );
+          changePerSecond = deltaValue / timeDifferenceInSeconds;
 
-          if (!ifspeed) {
-            return;
-          }
+          value = changePerSecond;
 
-          const up = deltaValue * 8 * 100;
-          const down =
-            timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
-          const bandwidthUtilization = up / down;
+          if (
+            item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
+            item.oid.includes("1.3.6.1.2.1.2.2.1.16")
+          ) {
+            let index = 0;
 
-          const itembandwidth = await Item.findOne({
-            host_id: host._id,
-            oid: item.oid,
-            isBandwidth: true,
-          });
-
-          if (itembandwidth) {
-            itembandwidth.status = 1;
-            await itembandwidth.save();
-            const bandwidthData = new Data({
-              metadata: {
-                item_id: itembandwidth._id,
-                host_id: host._id,
-              },
-              timestamp: currentTimestamp,
-              value: bandwidthUtilization.toFixed(2).toString(),
-              Change_per_second: bandwidthUtilization.toFixed(2).toString(),
-              expireAfterSeconds: 10,
-            });
-            await bandwidthData.save();
-            await hasTrigger(
-              host._id as mongoose.Types.ObjectId,
-              itembandwidth._id as mongoose.Types.ObjectId,
-              itembandwidth.item_name,
-              changePerSecond
+            if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
+              index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", ""));
+            } else {
+              index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", ""));
+            }
+            const ifspeed = host.interfaces.find(
+              (iface) => iface.interface_index === index
             );
+
+            if (!ifspeed) {
+              return;
+            }
+
+            const up = deltaValue * 8 * 100;
+            const down =
+              timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
+            const bandwidthUtilization = up / down;
+
+            let itembandwidth: IItem | null = await Item.findOne({
+              host_id: host._id,
+              oid: item.oid,
+              isBandwidth: true,
+            });
+
+            let newItemBandwidth: IItem;
+
+            if (!itembandwidth) {
+              const isIncoming = item.oid.includes("1.3.6.1.2.1.2.2.1.10");
+              const direction = isIncoming ? "Incoming" : "Outgoing";
+              const oidSuffix = isIncoming ? "10" : "16";
+
+              newItemBandwidth = new Item({
+                host_id: host._id,
+                item_name: `${ifspeed.interface_name} ${direction} Bandwidth Utilization`,
+                oid: `1.3.6.1.2.1.2.2.1.${oidSuffix}.${ifspeed.interface_index}`,
+                type: "integer",
+                unit: "%",
+                isBandwidth: true,
+              });
+
+              await newItemBandwidth.save();
+
+              await Host.findByIdAndUpdate(host._id, {
+                $push: { items: newItemBandwidth._id },
+              });
+
+              itembandwidth = newItemBandwidth;
+            }
+
+            if (itembandwidth) {
+              const bandwidthData = new Data({
+                metadata: {
+                  item_id: itembandwidth._id,
+                  host_id: host._id,
+                  isBandwidth: itembandwidth.isBandwidth,
+                },
+                timestamp: currentTimestamp,
+                value: bandwidthUtilization.toFixed(2),
+                current_value: bandwidthUtilization.toFixed(2),
+              });
+              await bandwidthData.save();
+              await hasTrigger(
+                host._id as mongoose.Types.ObjectId,
+                itembandwidth,
+                changePerSecond
+              );
+            }
           }
         }
+      } else if (
+        item.type.toLocaleLowerCase() === "integer" &&
+        !item.isBandwidth
+      ) {
+        value = currentValue;
       }
 
       // Create a new Data document
       const newData = new Data({
-        timestamp: currentTimestamp,
         metadata: {
           item_id: item._id,
           host_id: host._id,
+          isBandwidth: item.isBandwidth,
         },
-        value: currentValue.toString(),
-        Change_per_second: changePerSecond.toString(),
+        timestamp: currentTimestamp,
+        value: value,
+        current_value: currentValue,
       });
 
       // Save the data to the database
       await newData.save();
+      console.log(`Data saved for item ${item.item_name}`);
 
-      item.status = 1;
-      await item.save();
       host.status = 1;
       await host.save();
 
       await hasTrigger(
         host._id as mongoose.Types.ObjectId,
-        item._id as mongoose.Types.ObjectId,
-        item.item_name,
+        item,
         changePerSecond
       );
     } catch (error) {
-      item.status = 0;
-      await item.save();
-      if (
-        item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
-        item.oid.includes("1.3.6.1.2.1.2.2.1.16")
-      ) {
-        const itembandwidth = await Item.findOne({
-          host_id: item.host_id,
-          oid: item.oid,
-          isBandwidth: true,
-        });
-        if (itembandwidth) {
-          itembandwidth.status = 0;
-          await itembandwidth.save();
-        }
-      }
+      console.log(
+        `Error fetching and storing SNMP data for item ${item._id}: ${error}`
+      );
       await checkSnmpConnection(item.host_id.toString());
     }
   }
@@ -577,32 +597,32 @@ export async function fetchInterfaceHost(
   const columns = [1, 2, 3, 4, 5, 7, 8];
 
   const INTERFACE_METRICS = [
-    { suffix: "InOctets", oid: "10", type: "Counter64", unit: "Octets" },
-    { suffix: "InUcastPkts", oid: "11", type: "Counter64", unit: "Packets" },
+    { suffix: "InOctets", oid: "10", type: "Counter", unit: "Octets" },
+    { suffix: "InUcastPkts", oid: "11", type: "Counter", unit: "Packets" },
     {
       suffix: " InNUcastPkts",
       oid: "12",
       type: "Counter64",
       unit: "Packets",
     },
-    { suffix: "InDiscards", oid: "13", type: "Counter64", unit: "Packets" },
-    { suffix: "InErrors", oid: "14", type: "Counter64", unit: "Packets" },
+    { suffix: "InDiscards", oid: "13", type: "Counter", unit: "Packets" },
+    { suffix: "InErrors", oid: "14", type: "Counter", unit: "Packets" },
     {
       suffix: "InUnknownProtos",
       oid: "15",
       type: "Counter64",
       unit: "Packets",
     },
-    { suffix: "OutOctets", oid: "16", type: "Counter64", unit: "Octets" },
-    { suffix: "OutUcastPkts", oid: "17", type: "Counter64", unit: "Packets" },
+    { suffix: "OutOctets", oid: "16", type: "Counter", unit: "Octets" },
+    { suffix: "OutUcastPkts", oid: "17", type: "Counter", unit: "Packets" },
     {
       suffix: "OutNUcastPkts",
       oid: "18",
-      type: "Counter64",
+      type: "Counter",
       unit: "Packets",
     },
-    { suffix: "OutDiscards", oid: "19", type: "Counter64", unit: "Packets" },
-    { suffix: "OutErrors", oid: "20", type: "Counter64", unit: "Packets" },
+    { suffix: "OutDiscards", oid: "19", type: "Counter", unit: "Packets" },
+    { suffix: "OutErrors", oid: "20", type: "Counter", unit: "Packets" },
   ];
 
   try {
