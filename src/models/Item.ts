@@ -5,7 +5,7 @@ export interface IItem extends Document {
   host_id: mongoose.Types.ObjectId;
   item_name: string;
   oid: string;
-  type: string;
+  type: "counter" | "integer";
   unit: string;
   interval: number;
   status: number;
@@ -23,10 +23,10 @@ const itemSchema: Schema<IItem> = new mongoose.Schema(
     },
     item_name: { type: String, required: true },
     oid: { type: String, required: true },
-    type: { type: String, required: true },
+    type: { type: String, required: true, enum: ["counter", "integer"] },
     unit: { type: String, required: true },
     interval: { type: Number, default: 10 },
-    status: { type: Number, default: 0 },
+    status: { type: Number, default: 1 },
     isBandwidth: { type: Boolean, default: false },
   },
   {
