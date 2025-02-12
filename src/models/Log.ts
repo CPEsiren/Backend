@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
-import { createTime } from "../middleware/log";
+import { createTime } from "../middleware/Time";
 
 // Interface for the Log document
 export interface ILog extends Document {
