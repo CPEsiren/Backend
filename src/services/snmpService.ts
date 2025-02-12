@@ -1,6 +1,6 @@
 import { hasTrigger, sendNotification } from "./alertService";
 import Action from "../models/Action";
-import { createTime } from "../middleware/log";
+import { createTime } from "../middleware/Time";
 import Host from "../models/Host";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";
@@ -760,7 +760,7 @@ async function sendNotifications(message: string, prefix: string) {
   const notificationPromises = actions.map(async (action) => {
     const media = await Media.findById(action.media_id);
     if (media) {
-      await sendNotification(media, action.messageTemplate, prefix + message);
+      // await sendNotification(media, action.messageTemplate, prefix + message);
     }
   });
 }
