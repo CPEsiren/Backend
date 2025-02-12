@@ -6,7 +6,7 @@ import bodyParser from "body-parser";
 import { routes } from "./apis";
 import dotenv from "dotenv";
 import cors from "cors";
-import { createTime } from "./middleware/log";
+import { createTime } from "./middleware/Time";
 
 const app: Express = express();
 
