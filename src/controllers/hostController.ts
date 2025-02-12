@@ -6,6 +6,7 @@ import Item from "../models/Item";
 import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
+import Trigger from "../models/Trigger";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -200,16 +201,20 @@ export const deleteHost = async (req: Request, res: Response) => {
       }).session(session);
     }
 
-    await session.commitTransaction();
-    session.endSession();
-
     await Data.deleteMany({
       "metadata.host_id": new mongoose.Types.ObjectId(host_id),
-    });
+    }).session(session);
 
     await Trend.deleteMany({
       "metadata.host_id": new mongoose.Types.ObjectId(host_id),
-    });
+    }).session(session);
+
+    await Trigger.deleteMany({
+      host_id: new mongoose.Types.ObjectId(host_id),
+    }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(200).json({
       status: "success",
