@@ -7,6 +7,7 @@ import { parseExpressionDetailed } from "./parserService";
 import Host from "../models/Host";
 import Event from "../models/Event";
 import Data from "../models/Data";
+import { IItem } from "../models/Item";
 
 interface TriggerResult {
   triggered: boolean;
@@ -23,14 +24,13 @@ interface TriggerResult {
 
 export async function hasTrigger(
   host_id: mongoose.Types.ObjectId,
-  item_id: mongoose.Types.ObjectId,
-  item_name: string,
+  item: IItem,
   value: number
 ): Promise<ITrigger[] | null> {
   try {
     const triggers = await Trigger.find({
       host_id,
-      items: { $elemMatch: { $eq: [item_name, item_id] } },
+      items: { $elemMatch: { $eq: [item.item_name, item._id] } },
       enabled: true,
     });
 
@@ -43,7 +43,7 @@ export async function hasTrigger(
 
       // Find the position of item_name in the parsed expression
       const itemPosition = parsedExpression.findIndex((group) =>
-        group[0].includes(item_name)
+        group[0].includes(item.item_name)
       );
 
       const oldLogicExpression = trigger.logicExpression[itemPosition];
@@ -53,7 +53,7 @@ export async function hasTrigger(
         const isTriggered = await evaluateLogic(
           parsedExpression,
           itemPosition,
-          item_id,
+          item,
           host_id
         );
 
@@ -72,7 +72,7 @@ export async function hasTrigger(
         );
 
         const itemPosition = parsedRecoveryExpression.findIndex(
-          (group) => group[0] === item_name
+          (group) => group[0] === item.item_name
         );
 
         const oldLogicRecoveryExpression =
@@ -83,7 +83,7 @@ export async function hasTrigger(
           const isTriggered = await evaluateLogic(
             parsedRecoveryExpression,
             itemPosition,
-            item_id,
+            item,
             host_id
           );
 
@@ -164,7 +164,7 @@ export async function hasTrigger(
 export async function evaluateLogic(
   parsedExpression: (string | string[])[],
   itemPosition: number,
-  item_id: mongoose.Types.ObjectId,
+  item: IItem,
   host_id: mongoose.Types.ObjectId
 ): Promise<boolean> {
   const group = parsedExpression[itemPosition];
@@ -201,19 +201,20 @@ export async function evaluateLogic(
 
   if (func === "last") {
     const datas = await Data.findOne(
-      { metadata: { host_id: host_id, item_id: item_id } },
+      { metadata: { host_id: host_id, item_id: item._id } },
       {},
       { sort: { timestamp: -1 } }
     );
     if (datas) {
-      value = datas.Change_per_second;
+      value = datas.value;
     }
   } else if (func === "avg") {
     const data = await Data.aggregate([
       {
         $match: {
           "metadata.host_id": host_id,
-          "metadata.item_id": item_id,
+          "metadata.item_id": item._id,
+          "metadata.isBandwidth": item.isBandwidth,
           timestamp: { $gte: startTime, $lte: endTime },
         },
       },
@@ -222,8 +223,9 @@ export async function evaluateLogic(
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
+            isBandwidth: "$metadata.isBandwidth",
           },
-          averageValue: { $avg: "$Change_per_second" },
+          averageValue: { $avg: "$value" },
         },
       },
     ]);
@@ -241,7 +243,8 @@ export async function evaluateLogic(
       {
         $match: {
           "metadata.host_id": host_id,
-          "metadata.item_id": item_id,
+          "metadata.item_id": item._id,
+          "metadata.isBandwidth": item.isBandwidth,
           timestamp: { $gte: startTime, $lte: endTime },
         },
       },
@@ -250,6 +253,7 @@ export async function evaluateLogic(
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
+            isBandwidth: "$metadata.isBandwidth",
           },
           minValue: { $min: "$Change_per_second" },
         },
@@ -269,7 +273,8 @@ export async function evaluateLogic(
       {
         $match: {
           "metadata.host_id": host_id,
-          "metadata.item_id": item_id,
+          "metadata.item_id": item._id,
+          "metadata.isBandwidth": item.isBandwidth,
           timestamp: { $gte: startTime, $lte: endTime },
         },
       },
@@ -278,6 +283,7 @@ export async function evaluateLogic(
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
+            isBandwidth: "$metadata.isBandwidth",
           },
           maxValue: { $max: "$Change_per_second" },
         },
