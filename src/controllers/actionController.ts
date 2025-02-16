@@ -1,41 +1,71 @@
 import { Request, Response } from "express";
 import Action from "../models/Action";
+import { createTime } from "../middleware/Time";
+import Media from "../models/Media";
+import mongoose from "mongoose";
 
-const getActionById = async (
-  request: Request,
-  response: Response
-): Promise<void> => {
-  const { id } = request.params;
+const getActionById = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
 
   try {
-    console.log(`Attempting to find action with id ${id}`);
-    const action = await Action.findById(id).populate("triggerId mediaId");
+    const action = await Action.findById(id);
 
     if (!action) {
-      console.log(`Action not found with id ${id}`);
-      response.status(404).json({ message: "Action not found" });
+      res.status(404).json({ status: "fail", message: "Action not found" });
       return;
     }
 
-    console.log(`Found action with id ${id}`);
-    response.status(200).json(action);
+    res.status(200).json({ status: "success", data: action });
   } catch (error) {
-    console.log(`Error finding action with id ${id}: ${error}`);
-    response.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
+  }
+};
+
+const getActionUser = async (req: Request, res: Response) => {
+  const { user_id } = req.params;
+
+  try {
+    const actions = await Action.find({ user_id }).select(
+      "-user_id -__v -createdAt -updatedAt"
+    );
+
+    if (actions.length === 0) {
+      res
+        .status(404)
+        .json({ status: "fail", message: `User ${user_id} has no actions` });
+      return;
+    }
+
+    await Media.populate(actions, {
+      path: "media_id",
+      model: "Media",
+      select: "type -_id",
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: actions,
+    });
+  } catch (error) {
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const getActions = async (req: Request, res: Response) => {
   try {
     const actions = await Action.find();
-    const total = await Action.countDocuments();
+
+    if (!actions) {
+      res.status(404).json({ status: "fail", message: "Actions not found" });
+      return;
+    }
 
     res.status(200).json({
-      actions,
-      total,
+      status: "success",
+      data: actions,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -44,20 +74,116 @@ const createAction = async (req: Request, res: Response) => {
   session.startTransaction();
 
   try {
-    const { action_name, media_id, messageTemplate } = req.body;
+    const {
+      action_name,
+      user_id,
+      media,
+      subjectProblemTemplate,
+      messageProblemTemplate,
+      subjectRecoveryTemplate,
+      messageRecoveryTemplate,
+      duration,
+      enabled,
+    } = req.body;
 
-    if (!action_name || !media_id || !messageTemplate) {
+    const requiredFields = [
+      "action_name",
+      "user_id",
+      "media",
+      "subjectProblemTemplate",
+      "messageProblemTemplate",
+      "subjectRecoveryTemplate",
+      "messageRecoveryTemplate",
+      "duration",
+      "enabled",
+    ];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
       await session.abortTransaction();
       session.endSession();
 
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: missingFields,
+      });
+    }
+
+    const media_ids: mongoose.Types.ObjectId[] = [];
+
+    if (media === "email") {
+      const mediaEmail = await Media.findOne({
+        user_id: user_id,
+        type: "email",
+      });
+
+      if (!mediaEmail) {
+        await session.abortTransaction();
+        session.endSession();
+
+        return res.status(404).json({
+          status: "fail",
+          message: "Media Email not found",
+        });
+      }
+
+      media_ids.push(mediaEmail._id as mongoose.Types.ObjectId);
+    }
+
+    if (media === "line") {
+      const mediaLine = await Media.findOne({ type: "line" });
+
+      if (!mediaLine) {
+        await session.abortTransaction();
+        session.endSession();
+
+        return res.status(404).json({
+          status: "fail",
+          message: "Media Line not found",
+        });
+      }
+
+      media_ids.push(mediaLine._id as mongoose.Types.ObjectId);
+    }
+
+    if (media === "all media") {
+      const mediaLine = await Media.findOne({ type: "line" });
+      const mediaEmail = await Media.findOne({ type: "email" });
+
+      if (!mediaLine) {
+        await session.abortTransaction();
+        session.endSession();
+
+        return res.status(404).json({
+          status: "fail",
+          message: "Media Line not found",
+        });
+      } else if (!mediaEmail) {
+        await session.abortTransaction();
+        session.endSession();
+
+        return res.status(404).json({
+          status: "fail",
+          message: "Media Email not found",
+        });
+      }
+
+      media_ids.push(mediaLine._id as mongoose.Types.ObjectId);
+      media_ids.push(mediaEmail._id as mongoose.Types.ObjectId);
     }
 
     const newAction = new Action({
       action_name,
-      media_id,
-      messageTemplate,
-      enabled: true, // Default to enabled
+      user_id,
+      media_ids,
+      subjectProblemTemplate,
+      messageProblemTemplate,
+      subjectRecoveryTemplate,
+      messageRecoveryTemplate,
+      duration,
+      enabled,
+      createdAt: await createTime(), // Default to enabled
     });
 
     await newAction.save({ session });
@@ -66,14 +192,16 @@ const createAction = async (req: Request, res: Response) => {
     session.endSession();
 
     res.status(201).json({
+      status: "success",
       message: "Action created successfully",
-      action: newAction,
+      data: newAction,
     });
   } catch (error) {
+    console.log("Internal server error", error);
     await session.abortTransaction();
     session.endSession();
-    console.error("Error creating action:", error);
-    res.status(500).json({ message: "Internal server error" });
+
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -83,33 +211,46 @@ const updateAction = async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { name, media_id, messageTemplate, enabled } = req.body;
+    const {
+      action_name,
+      user_id,
+      media_id,
+      messageProblemTemplate,
+      messageRecoveryTemplate,
+      duration,
+      enabled,
+    } = req.body;
 
-    const action = await Action.findById(id).session(session);
+    const action = await Action.findByIdAndUpdate(id, {
+      action_name,
+      user_id,
+      media_id,
+      messageProblemTemplate,
+      messageRecoveryTemplate,
+      duration,
+      enabled,
+    }).session(session);
+
     if (!action) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({ message: "Action not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Action not found" });
     }
-
-    if (name) action.action_name = name;
-    if (media_id) action.media_id = media_id;
-    if (messageTemplate) action.messageTemplate = messageTemplate;
-    if (enabled !== undefined) action.enabled = enabled;
-
-    await action.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
     res.status(200).json({
+      status: "success",
       message: "Action updated successfully",
-      action,
+      data: action,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -121,24 +262,35 @@ const deleteAction = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const action = await Action.findByIdAndDelete(id).session(session);
+
     if (!action) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({ message: "Action not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Action not found" });
     }
 
     await session.commitTransaction();
     session.endSession();
 
-    res
-      .status(200)
-      .json({ message: `Action ${action.action_name} deleted successfully` });
+    res.status(200).json({
+      status: "success",
+      message: `Action ${action.action_name} deleted successfully`,
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-export { getActionById, getActions, createAction, updateAction, deleteAction };
+export {
+  getActionById,
+  getActionUser,
+  getActions,
+  createAction,
+  updateAction,
+  deleteAction,
+};
