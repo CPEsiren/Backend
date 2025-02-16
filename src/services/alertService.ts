@@ -1,13 +1,16 @@
 import { sendEmail } from "../services/mailService";
 import { sendLine } from "../services/lineService";
-import { IMedia } from "../models/Media";
+import Media, { IMedia } from "../models/Media";
 import Trigger, { ITrigger } from "../models/Trigger";
 import mongoose from "mongoose";
 import { parseExpressionDetailed } from "./parserService";
 import Host from "../models/Host";
-import Event from "../models/Event";
+import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
-import { IItem } from "../models/Item";
+import Item, { IItem } from "../models/Item";
+import Action, { IAction } from "../models/Action";
+import { ok } from "assert";
+import { stat } from "fs";
 
 interface TriggerResult {
   triggered: boolean;
@@ -24,8 +27,7 @@ interface TriggerResult {
 
 export async function hasTrigger(
   host_id: mongoose.Types.ObjectId,
-  item: IItem,
-  value: number
+  item: IItem
 ): Promise<ITrigger[] | null> {
   try {
     const triggers = await Trigger.find({
@@ -39,6 +41,8 @@ export async function hasTrigger(
     }
 
     triggers.forEach(async (trigger) => {
+      let valueAlerted = 0;
+
       const parsedExpression = parseExpressionDetailed(trigger.expression);
 
       // Find the position of item_name in the parsed expression
@@ -57,7 +61,10 @@ export async function hasTrigger(
           host_id
         );
 
-        trigger.logicExpression[itemPosition] = isTriggered ? "true" : "false";
+        trigger.logicExpression[itemPosition] = isTriggered.result
+          ? "true"
+          : "false";
+        valueAlerted = isTriggered.value;
       }
 
       const newLogicExpression = trigger.logicExpression[itemPosition];
@@ -87,9 +94,10 @@ export async function hasTrigger(
             host_id
           );
 
-          trigger.logicRecoveryExpression[itemPosition] = isTriggered
+          trigger.logicRecoveryExpression[itemPosition] = isTriggered.result
             ? "true"
             : "false";
+          valueAlerted = isTriggered.value;
         }
         const newLogicRecoveryExpression =
           trigger.logicRecoveryExpression[itemPosition];
@@ -146,7 +154,7 @@ export async function hasTrigger(
           }
         );
         if (isTriggered) {
-          await handleHasTrigger(trigger);
+          await handleHasTrigger(trigger, item, valueAlerted);
         }
       }
 
@@ -166,10 +174,14 @@ export async function evaluateLogic(
   itemPosition: number,
   item: IItem,
   host_id: mongoose.Types.ObjectId
-): Promise<boolean> {
+): Promise<{ result: boolean; value: number }> {
+  let value: number = 0;
   const group = parsedExpression[itemPosition];
   if (group.length !== 3) {
-    return false; // Invalid expression format
+    return {
+      result: false,
+      value,
+    };
   }
 
   const [rawItem, operator, threshold] = group;
@@ -180,12 +192,13 @@ export async function evaluateLogic(
     /(avg|min|max|last)\((.*?)(?:,\s*(\d+[mhd]))?\)/
   );
   if (!itemMatch) {
-    return false; // Invalid item format
+    return {
+      result: false,
+      value,
+    };
   }
 
   const [, func, name_item, duration = "15m"] = itemMatch;
-
-  let value: number = 0;
 
   let range = 15 * 60 * 1000; // Default to 15 minutes in milliseconds
   if (duration.endsWith("m")) {
@@ -201,7 +214,11 @@ export async function evaluateLogic(
 
   if (func === "last") {
     const datas = await Data.findOne(
-      { metadata: { host_id: host_id, item_id: item._id } },
+      {
+        "metadata.host_id": host_id,
+        "metadata.item_id": item._id,
+        "metadata.isBandwidth": item.isBandwidth,
+      },
       {},
       { sort: { timestamp: -1 } }
     );
@@ -236,7 +253,10 @@ export async function evaluateLogic(
       console.log(
         "No data found for the given host_id, item_id, and time range"
       );
-      return false;
+      return {
+        result: false,
+        value,
+      };
     }
   } else if (func === "min") {
     const data = await Data.aggregate([
@@ -255,7 +275,7 @@ export async function evaluateLogic(
             item_id: "$metadata.item_id",
             isBandwidth: "$metadata.isBandwidth",
           },
-          minValue: { $min: "$Change_per_second" },
+          minValue: { $min: "$value" },
         },
       },
     ]);
@@ -266,7 +286,10 @@ export async function evaluateLogic(
       console.log(
         "No data found for the given host_id, item_id, and time range"
       );
-      return false;
+      return {
+        result: false,
+        value,
+      };
     }
   } else if (func === "max") {
     const data = await Data.aggregate([
@@ -285,7 +308,7 @@ export async function evaluateLogic(
             item_id: "$metadata.item_id",
             isBandwidth: "$metadata.isBandwidth",
           },
-          maxValue: { $max: "$Change_per_second" },
+          maxValue: { $max: "$value" },
         },
       },
     ]);
@@ -296,7 +319,10 @@ export async function evaluateLogic(
       console.log(
         "No data found for the given host_id, item_id, and time range"
       );
-      return false;
+      return {
+        result: false,
+        value,
+      };
     }
   } else {
     console.log("Invalid function name");
@@ -304,20 +330,23 @@ export async function evaluateLogic(
 
   switch (operator) {
     case ">":
-      return value > numericThreshold;
+      return { result: value > numericThreshold, value };
     case ">=":
-      return value >= numericThreshold;
+      return { result: value >= numericThreshold, value };
     case "<":
-      return value < numericThreshold;
+      return { result: value < numericThreshold, value };
     case "<=":
-      return value <= numericThreshold;
+      return { result: value <= numericThreshold, value };
     case "=":
     case "==":
-      return value === numericThreshold;
+      return { result: value === numericThreshold, value };
     case "!=":
-      return value !== numericThreshold;
+      return { result: value !== numericThreshold, value };
     default:
-      return false; // Unknown operator
+      return {
+        result: false,
+        value,
+      };
   }
 }
 
@@ -350,51 +379,142 @@ async function calculateLogic(input: string[]): Promise<boolean> {
   return result;
 }
 
-async function handleHasTrigger(trigger: ITrigger) {
-  const host = await Host.findOne({ _id: trigger.host_id });
-  const hostname = host?.hostname ?? "Unknown Host"; // Provide a default value if host is null or undefined
-  await Event.findOneAndUpdate(
-    { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
-    {
-      trigger_id: trigger._id,
-      hostname,
-      status: "PROBLEM",
-      message: trigger.expression,
-    }, // Insert if not found
-    { upsert: true, new: true } // Upsert creates a new one if not found
-  );
+async function handleHasTrigger(
+  trigger: ITrigger,
+  item: IItem,
+  valueAlerted: number
+) {
+  try {
+    const host = await Host.findOne({ _id: trigger.host_id });
+    const hostname = host?.hostname ?? "Unknown Host"; // Provide a default value if host is null or undefined
+    const event = await Event.findOneAndUpdate(
+      { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
+      {
+        trigger_id: trigger._id,
+        severity: trigger.severity,
+        hostname,
+        status: "PROBLEM",
+        item_id: item._id,
+        value_alerted: valueAlerted,
+        message: trigger.expression,
+      }, // Insert if not found
+      { upsert: true, new: true } // Upsert creates a new one if not found
+    );
+    await handleAction(event, trigger);
+  } catch (error) {
+    console.log(error);
+  }
 }
 async function handleNotHasTrigger(trigger: ITrigger) {
   if (
     trigger.ok_event_generation === "recovery expression" &&
     trigger.isRecoveryExpressionValid
   ) {
-    await Event.findOneAndUpdate(
-      { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
+    const event = await Event.findOneAndUpdate(
+      {
+        trigger_id: trigger._id,
+        severity: trigger.severity,
+        status: "PROBLEM",
+      },
       {
         status: "RESOLVED",
       }
     );
+    if (event) await handleAction(event, trigger);
   } else if (trigger.ok_event_generation === "expression") {
-    await Event.findOneAndUpdate(
-      { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
+    const event = await Event.findOneAndUpdate(
+      {
+        trigger_id: trigger._id,
+        severity: trigger.severity,
+        status: "PROBLEM",
+      },
       {
         status: "RESOLVED",
-      }
+      },
+      { new: true }
     );
+    if (event) await handleAction(event, trigger);
   }
 }
 
+async function handleAction(event: IEvent, trigger: ITrigger) {
+  const actions = await Action.find({ enabled: true });
+
+  if (!actions) {
+    return;
+  }
+
+  actions.forEach(async (action) => {
+    action.media_ids.forEach(async (media_id) => {
+      const media = await Media.findOne({ _id: media_id, enabled: true });
+      if (media) {
+        await sendNotification(media, action, event, trigger);
+      }
+    });
+  });
+}
 export async function sendNotification(
   media: IMedia,
-  messageTemplate: string,
-  message: string
+  action: IAction,
+  event: IEvent,
+  trigger: ITrigger
 ) {
-  const combinedMessage = messageTemplate.replace("{}", message);
+  const host = await Host.findOne({ _id: trigger.host_id });
+  const item = await Item.findOne({ _id: event.item_id });
+  const { type, recipients } = media;
+  const { status } = event;
+  let subject: string = "";
+  let body: string = "";
+  if (status === "RESOLVED") {
+    const { subjectRecoveryTemplate, messageRecoveryTemplate } = action;
+    subject = subjectRecoveryTemplate;
+    body = messageRecoveryTemplate;
+  } else {
+    const { subjectProblemTemplate, messageProblemTemplate } = action;
+    subject = subjectProblemTemplate;
+    body = messageProblemTemplate;
+  }
 
-  if (media.type === "email") {
-    // await sendEmail(media.details[0].email, "Alert", combinedMessage);
-  } else if (media.type === "line") {
-    // await sendLine(media.details[0].user_id, combinedMessage);
+  const replacement = {
+    //General
+    "{DATE}": new Date().toLocaleString(),
+    //Trigger
+    "{TRIGGER.NAME}": trigger.trigger_name,
+    "{TRIGGER.EXPRESSION}": trigger.expression,
+    "{TRIGGER.RECOVERY_EXPRESSION}": trigger.recovery_expression,
+    "{TRIGGER.SEVERITY}": trigger.severity,
+    "{TRIGGER.STATUS}": status,
+    //Host
+    "{HOST.NAME}": host?.hostname ?? event.hostname,
+    "{HOST.IP}": host?.ip_address ?? "Unknown IP",
+    //Event
+    "{EVENT.ID}": event._id,
+    "{EVENT.SEVERITY}": event.severity,
+    "{EVENT.STATUS}": event.status,
+    "{EVENT.HOSTNAME}": event.hostname,
+    "{EVENT.ITEM_NAME}": item?.item_name,
+    "{EVENT.LASTVALUE}": event.value_alerted,
+    "{EVENT.PROBLEM.DATE}": event.createdAt.toDateString(),
+    "{EVENT.PROBLEM.TIME}": event.createdAt.toLocaleTimeString(),
+    "{EVENT.RECOVERY.DATE}": event.updatedAt.toDateString(),
+    "{EVENT.RECOVERY.TIME}": event.updatedAt.toLocaleTimeString(),
+  };
+
+  subject = Object.entries(replacement).reduce(
+    (acc, [key, value]) => acc.replace(key, value as string),
+    subject
+  );
+
+  body = Object.entries(replacement).reduce(
+    (acc, [key, value]) => acc.replace(key, value as string),
+    body
+  );
+
+  if (type === "email") {
+    console.log("Sending email...");
+    recipients.forEach((recipient) => {
+      // sendEmail(recipient, subject, body);
+    });
+  } else if (type === "line") {
   }
 }
