@@ -22,7 +22,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
       // Find the host associated with this item
       const host = await Host.findById(item.host_id);
       if (!host) {
-        throw new Error(`Host not found for item ${item._id}`);
+        return;
       }
       // Create SNMP session
       const session = snmp.createSession(host.ip_address, host.snmp_community, {
@@ -73,7 +73,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
           const timeDifferenceInSeconds =
             (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
-          console.log(timeDifferenceInSeconds);
 
           changePerSecond = deltaValue / timeDifferenceInSeconds;
 
@@ -148,8 +147,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               await bandwidthData.save();
               await hasTrigger(
                 host._id as mongoose.Types.ObjectId,
-                itembandwidth,
-                changePerSecond
+                itembandwidth
               );
             }
           }
@@ -175,20 +173,12 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
       // Save the data to the database
       await newData.save();
-      console.log(`Data saved for item ${item.item_name}`);
 
       host.status = 1;
       await host.save();
 
-      await hasTrigger(
-        host._id as mongoose.Types.ObjectId,
-        item,
-        changePerSecond
-      );
+      await hasTrigger(host._id as mongoose.Types.ObjectId, item);
     } catch (error) {
-      console.log(
-        `Error fetching and storing SNMP data for item ${item._id}: ${error}`
-      );
       await checkSnmpConnection(item.host_id.toString());
     }
   }
@@ -198,6 +188,7 @@ export async function checkSnmpConnection(host_id: string): Promise<void> {
   try {
     // Find the host by ID
     const host = await Host.findById(host_id);
+
     if (!host) {
       return;
     }
@@ -684,83 +675,4 @@ function getSnmpVersion(version: string): number {
     v3: snmp.Version3,
   };
   return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
-}
-
-// async function checkAndHandleTriggers(
-//   item: IItem,
-//   host: IHost,
-//   changePerSecond: number
-// ) {
-//   // Check if there is a trigger for this item
-//   const triggers = await hasTrigger(
-//     changePerSecond,
-//     host._id as mongoose.Types.ObjectId,
-//     item._id as mongoose.Types.ObjectId
-//   );
-
-//   if (triggers.triggered) {
-//     await handleTriggeredEvent(triggers, item, host, changePerSecond);
-//   } else if (!triggers.triggered && triggers.triggeredIds.length > 0) {
-//     await resolveExistingProblems(triggers.triggeredIds);
-//   }
-// }
-
-// async function handleTriggeredEvent(
-//   triggers: any,
-//   item: IItem,
-//   host: IHost,
-//   changePerSecond: number
-// ) {
-//   const trigger = await Trigger.findById(triggers.triggeredIds[0]);
-//   const lastEvent = await Event.findOne({
-//     trigger_id: triggers.triggeredIds[0],
-//     status: "PROBLEM",
-//   });
-
-//   if (!lastEvent) {
-//     const message = ` ${triggers.highestSeverity?.toLocaleUpperCase()} with item ${
-//       item.item_name
-//     } of host ${host.hostname}. ${changePerSecond} ${item.unit}/s. ${
-//       trigger?.ComparisonOperator
-//     } ${trigger?.valuetrigger} ${item.unit}/s.`;
-//     const newEvent = new Event({
-//       trigger_id: triggers.triggeredIds[0],
-//       hostname: host.hostname,
-//       status: "PROBLEM",
-//       message: message,
-//     });
-//     await newEvent.save();
-//     await addLog("INFO", `Event created: ${newEvent.message}`, false);
-
-//     // Send notifications for the new event
-//     await sendNotifications(message, "Problem: ");
-//   }
-// }
-
-async function resolveExistingProblems(
-  triggeredIds: mongoose.Types.ObjectId[]
-) {
-  const resolvePromises = triggeredIds.map(async (triggerId) => {
-    const activeEvent = await Event.findOneAndUpdate(
-      { trigger_id: triggerId, status: "PROBLEM" },
-      { status: "RESOLVED" },
-      { new: true }
-    );
-
-    if (activeEvent) {
-      await sendNotifications(activeEvent.message, "Resolved: ");
-    }
-  });
-
-  await Promise.all(resolvePromises);
-}
-
-async function sendNotifications(message: string, prefix: string) {
-  const actions = await Action.find({ enabled: true });
-  const notificationPromises = actions.map(async (action) => {
-    const media = await Media.findById(action.media_id);
-    if (media) {
-      // await sendNotification(media, action.messageTemplate, prefix + message);
-    }
-  });
 }
