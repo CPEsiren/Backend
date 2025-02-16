@@ -1,95 +1,127 @@
 import { Request, Response } from "express";
 import { User } from "../models/User";
 import Media from "../models/Media";
+import { createTime } from "../middleware/Time";
 
 const getMedia = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const media = await Media.find();
 
-    const media = await Media.findById(id).populate("userId");
-    if (!media) {
-      return res.status(404).json({ message: "Media not found" });
+    if (media.length === 0) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "No media found." });
     }
 
-    const user = await User.findById(media.user_id);
-
-    res.status(200).json(media);
+    res.status(200).json({
+      status: "success",
+      data: media,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-const getMediaList = async (req: Request, res: Response) => {
+const getMediaUser = async (req: Request, res: Response) => {
   try {
-    const { type, user_id } = req.query;
+    const { user_id } = req.params;
 
-    const query: any = {};
-    if (type) query.type = type;
-    if (user_id) query.user_id = user_id;
+    const media = await Media.find({ user_id: user_id });
 
-    const mediaList = await Media.find(query);
-
-    const total = await Media.countDocuments(query);
+    if (media.length === 0) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "User has no media." });
+    }
 
     res.status(200).json({
-      mediaList,
-      total,
+      status: "success",
+      data: media,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const createMedia = async (req: Request, res: Response) => {
   try {
-    const { type, details, user_id } = req.body;
+    const { user_id, type, recipients, disciption, enabled } = req.body;
 
-    if (!type || !details || !user_id) {
-      return res.status(400).json({ message: "Missing required fields" });
+    const requiredFields = ["user_id", "type", "recipients", "enabled"];
+
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: missingFields,
+      });
+    }
+
+    const user = await User.findById(user_id);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "User not found" });
     }
 
     const newMedia = new Media({
-      type,
-      details,
       user_id,
+      type,
+      recipients,
+      disciption,
+      enabled,
+      createdAt: await createTime(),
     });
 
     await newMedia.save();
 
-    const user = await User.findById(user_id);
-
     res.status(201).json({
-      message: `Media [${type}] of user [${user?.username}] created successfully`,
-      media: newMedia,
+      status: "success",
+      message: `Media [${type}] of user [${user_id}] created successfully`,
+      data: newMedia,
     });
   } catch (error) {
-    res.status(500).json({ message: `Error creating media: ${error}` });
+    res
+      .status(500)
+      .json({ status: "fail", message: `Error creating media: ${error}` });
   }
 };
 
 const updateMedia = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { type, details } = req.body;
 
-    const media = await Media.findById(id);
+    const media = Media.findById(id);
+
     if (!media) {
-      return res.status(404).json({ message: "Media not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Media not found" });
     }
 
-    if (type) media.type = type;
-    if (details) media.details = details;
+    const { user_id, type, recipients, disciption, enabled } = req.body;
 
-    await media.save();
-
-    const user = await User.findById(media.user_id);
+    const updateMedia = await Media.findByIdAndUpdate(id, {
+      user_id,
+      type,
+      recipients,
+      disciption,
+      enabled,
+      updatedAt: await createTime(),
+    });
 
     res.status(200).json({
-      message: `Media [${media.type}] of user [${user?.username}] updated successfully`,
-      media,
+      status: "success",
+      message: `Media [${id}] of user [${updateMedia?.user_id}] updated successfully`,
+      data: media,
     });
   } catch (error) {
-    res.status(500).json({ message: `Error updating media: ${error}` });
+    res
+      .status(500)
+      .json({ status: "fail", message: `Error updating media: ${error}` });
   }
 };
 
@@ -99,17 +131,20 @@ const deleteMedia = async (req: Request, res: Response) => {
 
     const media = await Media.findByIdAndDelete(id);
     if (!media) {
-      return res.status(404).json({ message: "Media not found" });
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Media not found" });
     }
 
-    const user = await User.findById(media.user_id);
-
     res.status(200).json({
-      message: `Media [${media.type}] of user [${user?.username}] deleted successfully`,
+      status: "success",
+      message: `Media [${media.type}] of user [${media.user_id}] deleted successfully`,
     });
   } catch (error) {
-    res.status(500).json({ message: `Error deleting media: ${error}` });
+    res
+      .status(500)
+      .json({ status: "fail", message: `Error deleting media: ${error}` });
   }
 };
 
-export { getMedia, getMediaList, createMedia, updateMedia, deleteMedia };
+export { getMedia, getMediaUser, createMedia, updateMedia, deleteMedia };
