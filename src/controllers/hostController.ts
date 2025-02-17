@@ -44,7 +44,13 @@ export const getHostById = async (req: Request, res: Response) => {
       });
     }
 
-    const host = await Host.findById(host_id).populate("items").lean().exec();
+    const host = await Host.findById(host_id).lean().exec();
+
+    await Host.populate(host, {
+      path: "items",
+      model: "Item",
+      select: "-__v -isBandwidth -host_id",
+    });
 
     if (!host) {
       return res.status(404).json({
@@ -201,20 +207,20 @@ export const deleteHost = async (req: Request, res: Response) => {
       }).session(session);
     }
 
-    await Data.deleteMany({
-      "metadata.host_id": new mongoose.Types.ObjectId(host_id),
-    }).session(session);
-
-    await Trend.deleteMany({
-      "metadata.host_id": new mongoose.Types.ObjectId(host_id),
-    }).session(session);
-
     await Trigger.deleteMany({
       host_id: new mongoose.Types.ObjectId(host_id),
     }).session(session);
 
     await session.commitTransaction();
     session.endSession();
+
+    await Data.deleteMany({
+      "metadata.host_id": new mongoose.Types.ObjectId(host_id),
+    });
+
+    await Trend.deleteMany({
+      "metadata.host_id": new mongoose.Types.ObjectId(host_id),
+    });
 
     res.status(200).json({
       status: "success",
