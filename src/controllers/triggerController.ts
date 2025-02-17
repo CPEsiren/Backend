@@ -93,12 +93,14 @@ const createTrigger = async (req: Request, res: Response) => {
 
     //parse expression
     const parsedItemsExp = new Set(parseExpressionToItems(expression));
+
     const logicExpression = parseExpressionDetailed(expression).map((item) => {
       if (Array.isArray(item) && item.length === 3) {
         return "false"; // แทนที่เงื่อนไขด้วย 'false'
       }
       return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
     });
+
     if (recovery_expression) {
       const parsedRecoveryItems = parseExpressionToItems(recovery_expression);
       parsedRecoveryItems.forEach((item) => parsedItemsExp.add(item));
@@ -120,6 +122,8 @@ const createTrigger = async (req: Request, res: Response) => {
       return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
     });
 
+    let type = "item";
+
     for (const itemName of parsedItemsExp) {
       if (!addedItemNames.has(itemName)) {
         const item = await Item.findOne({ item_name: itemName });
@@ -127,10 +131,20 @@ const createTrigger = async (req: Request, res: Response) => {
           items.push([itemName, item._id]);
           addedItemNames.add(itemName);
         } else {
-          return res.status(400).json({
-            status: "fail",
-            message: `Item [${itemName}] not found`,
-          });
+          if (
+            !(
+              itemName.includes("Device Status") ||
+              itemName.includes("Interface Operation Status") ||
+              itemName.includes("Interface Admin Status")
+            )
+          ) {
+            return res.status(400).json({
+              status: "fail",
+              message: `Item [${itemName}] not found`,
+            });
+          } else {
+            type = "host";
+          }
         }
       }
     }
@@ -138,6 +152,7 @@ const createTrigger = async (req: Request, res: Response) => {
     // Create new trigger
     const newTrigger = new Trigger({
       trigger_name,
+      type,
       host_id,
       severity,
       expression,
