@@ -29,6 +29,14 @@ export interface ITrigger extends Document {
     functionofItem: string;
     duration: number;
   }[];
+  expressionRecoveryPart: {
+    item: string;
+    operation: string;
+    value: string;
+    operator: string;
+    functionofItem: string;
+    duration: number;
+  }[];
 }
 
 const TriggerSchema: Schema<ITrigger> = new Schema(
@@ -97,6 +105,19 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       default: true,
     },
     expressionPart: {
+      type: [
+        {
+          item: String,
+          operation: String,
+          value: String,
+          operator: String,
+          functionofItem: String,
+          duration: Number,
+        },
+      ],
+      default: [],
+    },
+    expressionRecoveryPart: {
       type: [
         {
           item: String,
