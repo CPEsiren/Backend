@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IEvent extends Document {
   trigger_id: mongoose.Types.ObjectId;
+  type: "item" | "host";
   severity:
     | "not classified"
     | "information"
@@ -11,7 +12,6 @@ export interface IEvent extends Document {
     | "disaster";
   hostname: string;
   status: "PROBLEM" | "RESOLVED";
-  item_id: mongoose.Types.ObjectId;
   value_alerted: number;
   message: string;
   createdAt: Date;
@@ -23,6 +23,10 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
     trigger_id: {
       type: Schema.Types.ObjectId,
       ref: "Trigger",
+    },
+    type: {
+      type: String,
+      enum: ["item", "host"],
       required: true,
     },
     severity: {
@@ -44,10 +48,6 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
     status: {
       type: String,
       enum: ["PROBLEM", "RESOLVED"],
-    },
-    item_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Item",
     },
     value_alerted: { type: Number, required: true },
     message: { type: String, required: true },
