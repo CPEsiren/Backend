@@ -3,36 +3,45 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IMedia extends Document {
-  type: "email" | "line";
-  details: Record<string, any>;
   user_id: mongoose.Types.ObjectId;
+  type: "email" | "line";
+  recipients: string[];
+  disciption: string;
+  enabled: boolean;
+  createdAt: Date;
 }
 
 const MediaSchema: Schema<IMedia> = new Schema(
   {
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     type: {
       type: String,
       enum: ["email", "line"],
       required: true,
     },
-    details: [
-      {
-        type: Schema.Types.Mixed,
-        required: true,
-      },
-    ],
-    user_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+    recipients: {
+      type: [String],
       required: true,
+    },
+    disciption: {
+      type: String,
+      default: "",
+    },
+    enabled: {
+      type: Boolean,
+      default: true,
     },
   },
   {
-    timestamps: true,
+    timestamps: {
+      createdAt: true,
+      updatedAt: true,
+    },
   }
 );
-
-// Compound index for efficient querying
-MediaSchema.index({ userId: 1, type: 1 });
 
 export default mongoose.model<IMedia>("Media", MediaSchema);
