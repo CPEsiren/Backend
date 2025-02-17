@@ -77,7 +77,8 @@ const createTrigger = async (req: Request, res: Response) => {
       "expression",
       "ok_event_generation",
       "enabled",
-      expressionPart,
+      "expressionPart",
+      "expressionRecoveryPart",
     ];
 
     const missingFields = requiredFields.filter((field) => !req.body[field]);
