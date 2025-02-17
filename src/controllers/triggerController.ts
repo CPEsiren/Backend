@@ -66,6 +66,7 @@ const createTrigger = async (req: Request, res: Response) => {
       ok_event_generation,
       recovery_expression,
       enabled,
+      expressionPart,
     } = req.body;
 
     const requiredFields = [
@@ -75,6 +76,7 @@ const createTrigger = async (req: Request, res: Response) => {
       "expression",
       "ok_event_generation",
       "enabled",
+      expressionPart,
     ];
 
     const missingFields = requiredFields.filter((field) => !req.body[field]);
@@ -162,6 +164,7 @@ const createTrigger = async (req: Request, res: Response) => {
       recovery_expression,
       logicRecoveryExpression,
       enabled,
+      expressionPart,
     });
 
     // Save the trigger
