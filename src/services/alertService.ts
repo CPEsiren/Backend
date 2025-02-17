@@ -3,7 +3,10 @@ import { sendLine } from "../services/lineService";
 import Media, { IMedia } from "../models/Media";
 import Trigger, { ITrigger } from "../models/Trigger";
 import mongoose from "mongoose";
-import { parseExpressionDetailed } from "./parserService";
+import {
+  parseExpressionDetailed,
+  parseExpressionToItems,
+} from "./parserService";
 import Host from "../models/Host";
 import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
@@ -154,7 +157,7 @@ export async function hasTrigger(
           }
         );
         if (isTriggered) {
-          await handleHasTrigger(trigger, item, valueAlerted);
+          await handleHasTrigger(trigger, valueAlerted);
         }
       }
 
@@ -166,6 +169,62 @@ export async function hasTrigger(
     return triggers;
   } catch (error) {
     return null;
+  }
+}
+
+export async function evaluateHost(
+  trigger: ITrigger,
+  valueAlerted: number
+): Promise<{ result: boolean; value: number }> {
+  const itemName = parseExpressionToItems(trigger.expression);
+
+  const parsedExpression = parseExpressionDetailed(trigger.expression);
+
+  // Find the position of item_name in the parsed expression
+  const itemPosition = parsedExpression.findIndex((group) =>
+    group[0].includes(itemName[0])
+  );
+
+  const group = parsedExpression[itemPosition];
+  if (group.length !== 3) {
+    return {
+      result: false,
+      value: valueAlerted,
+    };
+  }
+
+  const [rawItem, operator, threshold] = group;
+  const numericThreshold = parseFloat(threshold);
+
+  const itemMatch = rawItem.match(
+    /(avg|min|max|last)\((.*?)(?:,\s*(\d+[mhd]))?\)/
+  );
+  if (!itemMatch) {
+    return {
+      result: false,
+      value: valueAlerted,
+    };
+  }
+
+  switch (operator) {
+    case ">":
+      return { result: valueAlerted > numericThreshold, value: valueAlerted };
+    case ">=":
+      return { result: valueAlerted >= numericThreshold, value: valueAlerted };
+    case "<":
+      return { result: valueAlerted < numericThreshold, value: valueAlerted };
+    case "<=":
+      return { result: valueAlerted <= numericThreshold, value: valueAlerted };
+    case "=":
+    case "==":
+      return { result: valueAlerted === numericThreshold, value: valueAlerted };
+    case "!=":
+      return { result: valueAlerted !== numericThreshold, value: valueAlerted };
+    default:
+      return {
+        result: false,
+        value: valueAlerted,
+      };
   }
 }
 
@@ -350,7 +409,7 @@ export async function evaluateLogic(
   }
 }
 
-async function calculateLogic(input: string[]): Promise<boolean> {
+export async function calculateLogic(input: string[]): Promise<boolean> {
   if (input.length === 0) {
     return false;
   }
@@ -379,9 +438,8 @@ async function calculateLogic(input: string[]): Promise<boolean> {
   return result;
 }
 
-async function handleHasTrigger(
+export async function handleHasTrigger(
   trigger: ITrigger,
-  item: IItem,
   valueAlerted: number
 ) {
   try {
@@ -391,10 +449,10 @@ async function handleHasTrigger(
       { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
       {
         trigger_id: trigger._id,
+        type: "item",
         severity: trigger.severity,
         hostname,
         status: "PROBLEM",
-        item_id: item._id,
         value_alerted: valueAlerted,
         message: trigger.expression,
       }, // Insert if not found
@@ -405,7 +463,7 @@ async function handleHasTrigger(
     console.log(error);
   }
 }
-async function handleNotHasTrigger(trigger: ITrigger) {
+export async function handleNotHasTrigger(trigger: ITrigger) {
   if (
     trigger.ok_event_generation === "recovery expression" &&
     trigger.isRecoveryExpressionValid
@@ -413,12 +471,14 @@ async function handleNotHasTrigger(trigger: ITrigger) {
     const event = await Event.findOneAndUpdate(
       {
         trigger_id: trigger._id,
+        type: "item",
         severity: trigger.severity,
         status: "PROBLEM",
       },
       {
         status: "RESOLVED",
-      }
+      },
+      { new: true }
     );
     if (event) await handleAction(event, trigger);
   } else if (trigger.ok_event_generation === "expression") {
@@ -437,7 +497,7 @@ async function handleNotHasTrigger(trigger: ITrigger) {
   }
 }
 
-async function handleAction(event: IEvent, trigger: ITrigger) {
+export async function handleAction(event: IEvent, trigger: ITrigger) {
   const actions = await Action.find({ enabled: true });
 
   if (!actions) {
@@ -460,7 +520,6 @@ export async function sendNotification(
   trigger: ITrigger
 ) {
   const host = await Host.findOne({ _id: trigger.host_id });
-  const item = await Item.findOne({ _id: event.item_id });
   const { type, recipients } = media;
   const { status } = event;
   let subject: string = "";
@@ -492,7 +551,6 @@ export async function sendNotification(
     "{EVENT.SEVERITY}": event.severity,
     "{EVENT.STATUS}": event.status,
     "{EVENT.HOSTNAME}": event.hostname,
-    "{EVENT.ITEM_NAME}": item?.item_name,
     "{EVENT.LASTVALUE}": event.value_alerted,
     "{EVENT.PROBLEM.DATE}": event.createdAt.toDateString(),
     "{EVENT.PROBLEM.TIME}": event.createdAt.toLocaleTimeString(),
