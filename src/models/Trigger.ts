@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface ITrigger extends Document {
   trigger_name: string;
+  type: "item" | "host";
   host_id: mongoose.Types.ObjectId;
   severity:
     | "not classified"
@@ -28,6 +29,11 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    type: {
+      type: String,
+      enum: ["item", "host"],
+      required: true,
     },
     host_id: {
       type: Schema.Types.ObjectId,
