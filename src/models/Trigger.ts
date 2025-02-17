@@ -21,6 +21,14 @@ export interface ITrigger extends Document {
   isRecoveryExpressionValid: boolean;
   enabled: boolean;
   createdAt: Date;
+  expressionPart: {
+    item: string;
+    operation: string;
+    value: string;
+    operator: string;
+    functionofItem: string;
+    duration: number;
+  }[];
 }
 
 const TriggerSchema: Schema<ITrigger> = new Schema(
@@ -87,6 +95,19 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
     enabled: {
       type: Boolean,
       default: true,
+    },
+    expressionPart: {
+      type: [
+        {
+          item: String,
+          operation: String,
+          value: String,
+          operator: String,
+          functionofItem: String,
+          duration: Number,
+        },
+      ],
+      default: [],
     },
   },
   {
