@@ -1,19 +1,44 @@
-import { fetchAndStoreSnmpDataForItem } from "./snmpService";
+import {
+  checkInterfaceStatus,
+  checkSnmpConnection,
+  fetchAndStoreSnmpDataForItem,
+} from "./snmpService";
 import Item from "../models/Item";
 import Data from "../models/Data";
 import Trend from "../models/Trend";
+import Host from "../models/Host";
 
 const schedules: { [key: string]: NodeJS.Timeout } = {};
 
 export async function setupSchedules() {
   const items = await Item.find({ status: 1 });
+  const hosts = await Host.find();
 
   for (const item of items) {
     scheduleItem(item);
   }
 
+  for (const host of hosts) {
+    scheduleHost(host);
+  }
+
   // Schedule the hourly data summarization
   scheduleHourlySummarization();
+}
+
+export function scheduleHost(host: any) {
+  if (schedules[host._id]) {
+    clearInterval(schedules[host._id]);
+  }
+
+  schedules[host._id] = setInterval(async () => {
+    try {
+      await checkSnmpConnection(host._id);
+      await checkInterfaceStatus(host._id);
+    } catch (error) {
+      console.error(`Error fetching data for host ${host._id}:`, error);
+    }
+  }, 10 * 1000);
 }
 
 export function scheduleItem(item: any) {
@@ -30,10 +55,10 @@ export function scheduleItem(item: any) {
   }, item.interval * 1000);
 }
 
-export function clearSchedule(itemId: string) {
-  if (schedules[itemId]) {
-    clearInterval(schedules[itemId]);
-    delete schedules[itemId];
+export function clearSchedule(Id: string) {
+  if (schedules[Id]) {
+    clearInterval(schedules[Id]);
+    delete schedules[Id];
   }
 }
 
