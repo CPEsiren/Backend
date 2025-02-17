@@ -27,7 +27,7 @@ export interface ITrigger extends Document {
     value: string;
     operator: string;
     functionofItem: string;
-    duration: number;
+    duration: string;
   }[];
   expressionRecoveryPart: {
     item: string;
@@ -35,7 +35,7 @@ export interface ITrigger extends Document {
     value: string;
     operator: string;
     functionofItem: string;
-    duration: number;
+    duration: string;
   }[];
 }
 
@@ -112,7 +112,7 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
           value: String,
           operator: String,
           functionofItem: String,
-          duration: Number,
+          duration: String,
         },
       ],
       default: [],
@@ -125,7 +125,7 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
           value: String,
           operator: String,
           functionofItem: String,
-          duration: Number,
+          duration: String,
         },
       ],
       default: [],
