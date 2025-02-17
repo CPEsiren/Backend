@@ -67,6 +67,7 @@ const createTrigger = async (req: Request, res: Response) => {
       recovery_expression,
       enabled,
       expressionPart,
+      expressionRecoveryPart,
     } = req.body;
 
     const requiredFields = [
@@ -165,6 +166,7 @@ const createTrigger = async (req: Request, res: Response) => {
       logicRecoveryExpression,
       enabled,
       expressionPart,
+      expressionRecoveryPart,
     });
 
     // Save the trigger
@@ -189,6 +191,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       recovery_expression,
       ok_event_generation,
       enabled,
+      expressionPart,
+      expressionRecoveryPart,
     } = req.body;
 
     const items: [string, mongoose.Types.ObjectId][] = [];
@@ -243,6 +247,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       recovery_expression,
       logicRecoveryExpression,
       enabled,
+      expressionPart,
+      expressionRecoveryPart,
     });
 
     res.status(200).json({
