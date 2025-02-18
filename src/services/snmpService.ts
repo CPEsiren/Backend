@@ -9,15 +9,15 @@ import {
 } from "./alertService";
 import Action from "../models/Action";
 import { createTime } from "../middleware/Time";
-import Host from "../models/Host";
+import Host, { IauthenV3, IHost } from "../models/Host";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";
 import Event from "../models/Event";
 import Media from "../models/Media";
 import mongoose from "mongoose";
 import snmp from "net-snmp";
-import { uptime } from "process";
 import Trigger from "../models/Trigger";
+import { auth } from "google-auth-library";
 
 interface InterfaceItem {
   item_name: string;
@@ -46,157 +46,162 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         return;
       }
 
-      // Create SNMP session
-      const session = snmp.createSession(host.ip_address, host.snmp_community, {
-        port: host.snmp_port,
-        version: getSnmpVersion(host.snmp_version as string),
-      });
+      if (host.status === 1) {
+        // Create SNMP session
+        const session = await createSessionSNMP(
+          host.ip_address,
+          host.snmp_community,
+          host.snmp_port,
+          host.snmp_version,
+          host.authenV3
+        );
 
-      // Fetch SNMP data
-      const oids = [item.oid];
-      const result = await new Promise<any>((resolve, reject) => {
-        session.get(oids, (error: any, varbinds: any) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(varbinds[0]);
-          }
-        });
-      });
-
-      // Close the SNMP session
-      session.close();
-
-      // Process the result
-      if (snmp.isVarbindError(result)) {
-        return;
-      }
-
-      // Get the current value
-      const currentValue = parseFloat(result.value.toString());
-      const currentTimestamp = new Date(await createTime());
-
-      let value: number = 0;
-      let deltaValue = 0;
-      let changePerSecond: number = 0;
-
-      if (item.type.toLocaleLowerCase() === "counter") {
-        // Find the latest data for this item
-        const latestData = await Data.findOne({
-          "metadata.item_id": item._id,
-          "metadata.host_id": host._id,
-        }).sort({ timestamp: -1 });
-
-        if (latestData) {
-          const previousValue = latestData.current_value;
-          const previousTimestamp = new Date(latestData.timestamp as Date);
-
-          deltaValue = currentValue - previousValue;
-
-          const timeDifferenceInSeconds =
-            (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
-
-          changePerSecond = deltaValue / timeDifferenceInSeconds;
-
-          value = changePerSecond;
-
-          if (
-            item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
-            item.oid.includes("1.3.6.1.2.1.2.2.1.16")
-          ) {
-            let index = 0;
-
-            if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
-              index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", ""));
+        // Fetch SNMP data
+        const oids = [item.oid];
+        const result = await new Promise<any>((resolve, reject) => {
+          session.get(oids, (error: any, varbinds: any) => {
+            if (error) {
+              reject(error);
             } else {
-              index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", ""));
+              resolve(varbinds[0]);
             }
-            const ifspeed = host.interfaces.find(
-              (iface) => iface.interface_index === index
-            );
+          });
+        });
 
-            if (!ifspeed) {
-              return;
-            }
+        // Close the SNMP session
+        session.close();
 
-            const up = deltaValue * 8 * 100;
-            const down =
-              timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
-            const bandwidthUtilization = up / down;
+        // Process the result
+        if (snmp.isVarbindError(result)) {
+          return;
+        }
 
-            let itembandwidth: IItem | null = await Item.findOne({
-              host_id: host._id,
-              oid: item.oid,
-              isBandwidth: true,
-            });
+        // Get the current value
+        const currentValue = parseFloat(result.value.toString());
+        const currentTimestamp = new Date(await createTime());
 
-            let newItemBandwidth: IItem;
+        let value: number = 0;
+        let deltaValue = 0;
+        let changePerSecond: number = 0;
 
-            if (!itembandwidth) {
-              const isIncoming = item.oid.includes("1.3.6.1.2.1.2.2.1.10");
-              const direction = isIncoming ? "Incoming" : "Outgoing";
-              const oidSuffix = isIncoming ? "10" : "16";
+        if (item.type.toLocaleLowerCase() === "counter") {
+          // Find the latest data for this item
+          const latestData = await Data.findOne({
+            "metadata.item_id": item._id,
+            "metadata.host_id": host._id,
+          }).sort({ timestamp: -1 });
 
-              newItemBandwidth = new Item({
+          if (latestData) {
+            const previousValue = latestData.current_value;
+            const previousTimestamp = new Date(latestData.timestamp as Date);
+
+            deltaValue = currentValue - previousValue;
+
+            const timeDifferenceInSeconds =
+              (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
+
+            changePerSecond = deltaValue / timeDifferenceInSeconds;
+
+            value = changePerSecond;
+
+            if (
+              item.oid.includes("1.3.6.1.2.1.2.2.1.10") ||
+              item.oid.includes("1.3.6.1.2.1.2.2.1.16")
+            ) {
+              let index = 0;
+
+              if (item.oid.includes("1.3.6.1.2.1.2.2.1.10")) {
+                index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.10.", ""));
+              } else {
+                index = parseInt(item.oid.replace("1.3.6.1.2.1.2.2.1.16.", ""));
+              }
+              const ifspeed = host.interfaces.find(
+                (iface) => iface.interface_index === index
+              );
+
+              if (!ifspeed) {
+                return;
+              }
+
+              const up = deltaValue * 8 * 100;
+              const down =
+                timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
+              const bandwidthUtilization = up / down;
+
+              let itembandwidth: IItem | null = await Item.findOne({
                 host_id: host._id,
-                item_name: `${ifspeed.interface_name} ${direction} Bandwidth Utilization`,
-                oid: `1.3.6.1.2.1.2.2.1.${oidSuffix}.${ifspeed.interface_index}`,
-                type: "integer",
-                unit: "%",
+                oid: item.oid,
                 isBandwidth: true,
               });
 
-              await newItemBandwidth.save();
+              let newItemBandwidth: IItem;
 
-              await Host.findByIdAndUpdate(host._id, {
-                $push: { items: newItemBandwidth._id },
-              });
+              if (!itembandwidth) {
+                const isIncoming = item.oid.includes("1.3.6.1.2.1.2.2.1.10");
+                const direction = isIncoming ? "Incoming" : "Outgoing";
+                const oidSuffix = isIncoming ? "10" : "16";
 
-              itembandwidth = newItemBandwidth;
-            }
-
-            if (itembandwidth) {
-              const bandwidthData = new Data({
-                metadata: {
-                  item_id: itembandwidth._id,
+                newItemBandwidth = new Item({
                   host_id: host._id,
-                  isBandwidth: itembandwidth.isBandwidth,
-                },
-                timestamp: currentTimestamp,
-                value: bandwidthUtilization.toFixed(2),
-                current_value: bandwidthUtilization.toFixed(2),
-              });
-              await bandwidthData.save();
-              await hasTrigger(
-                host._id as mongoose.Types.ObjectId,
-                itembandwidth
-              );
+                  item_name: `${ifspeed.interface_name} ${direction} Bandwidth Utilization`,
+                  oid: `1.3.6.1.2.1.2.2.1.${oidSuffix}.${ifspeed.interface_index}`,
+                  type: "integer",
+                  unit: "%",
+                  isBandwidth: true,
+                });
+
+                await newItemBandwidth.save();
+
+                await Host.findByIdAndUpdate(host._id, {
+                  $push: { items: newItemBandwidth._id },
+                });
+
+                itembandwidth = newItemBandwidth;
+              }
+
+              if (itembandwidth) {
+                const bandwidthData = new Data({
+                  metadata: {
+                    item_id: itembandwidth._id,
+                    host_id: host._id,
+                    isBandwidth: itembandwidth.isBandwidth,
+                  },
+                  timestamp: currentTimestamp,
+                  value: bandwidthUtilization.toFixed(2),
+                  current_value: bandwidthUtilization.toFixed(2),
+                });
+                await bandwidthData.save();
+                await hasTrigger(
+                  host._id as mongoose.Types.ObjectId,
+                  itembandwidth
+                );
+              }
             }
           }
+        } else if (
+          item.type.toLocaleLowerCase() === "integer" &&
+          !item.isBandwidth
+        ) {
+          value = currentValue;
         }
-      } else if (
-        item.type.toLocaleLowerCase() === "integer" &&
-        !item.isBandwidth
-      ) {
-        value = currentValue;
+
+        // Create a new Data document
+        const newData = new Data({
+          metadata: {
+            item_id: item._id,
+            host_id: host._id,
+            isBandwidth: item.isBandwidth,
+          },
+          timestamp: currentTimestamp,
+          value: value,
+          current_value: currentValue,
+        });
+
+        // Save the data to the database
+        await newData.save();
+
+        await hasTrigger(host._id as mongoose.Types.ObjectId, item);
       }
-
-      // Create a new Data document
-      const newData = new Data({
-        metadata: {
-          item_id: item._id,
-          host_id: host._id,
-          isBandwidth: item.isBandwidth,
-        },
-        timestamp: currentTimestamp,
-        value: value,
-        current_value: currentValue,
-      });
-
-      // Save the data to the database
-      await newData.save();
-
-      await hasTrigger(host._id as mongoose.Types.ObjectId, item);
     } catch (error) {
       console.log("fetchAndStoreSnmpDataForItem : ", error);
     }
@@ -214,12 +219,13 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
     const interfaces = host.interfaces;
 
     if (host.status === 1) {
-      const session = snmp.createSession(host.ip_address, host.snmp_community, {
-        port: host.snmp_port,
-        version: getSnmpVersion(host.snmp_version as string),
-        timeout: 5000, // 5 seconds timeout
-        retries: 1,
-      });
+      const session = await createSessionSNMP(
+        host.ip_address,
+        host.snmp_community,
+        host.snmp_port,
+        host.snmp_version,
+        host.authenV3
+      );
 
       const triggerAdmin = await Trigger.find({
         host_id: host_id,
@@ -327,12 +333,13 @@ export async function checkSnmpConnection(host_id: string) {
     }
 
     // Create SNMP session
-    const session = snmp.createSession(host.ip_address, host.snmp_community, {
-      port: host.snmp_port,
-      version: getSnmpVersion(host.snmp_version as string),
-      timeout: 5000, // 5 seconds timeout
-      retries: 1,
-    });
+    const session = await createSessionSNMP(
+      host.ip_address,
+      host.snmp_community,
+      host.snmp_port,
+      host.snmp_version,
+      host.authenV3
+    );
 
     // Try to fetch a simple OID (system description) to test the connection
     const oid = "1.3.6.1.2.1.1.3.0"; // System Description OID
@@ -424,7 +431,15 @@ export async function fetchDetailHost(
   ip_address: string,
   snmp_community: string,
   snmp_port: string,
-  snmp_version: string
+  snmp_version: string,
+  authenV3: {
+    username: string;
+    securityLevel: string;
+    authenProtocol: string;
+    authenPass: string;
+    privacyProtocol: string;
+    privacyPass: string;
+  }
 ): Promise<{
   interfaces: any[];
   details: Record<string, string>;
@@ -719,10 +734,13 @@ export async function fetchDetailHost(
   type SystemDetailKey = keyof typeof SYSTEM_DETAIL_OIDS;
   try {
     // Create SNMP session
-    const session = snmp.createSession(ip_address, snmp_community, {
-      port: snmp_port,
-      version: getSnmpVersion(snmp_version),
-    });
+    const session = await createSessionSNMP(
+      ip_address,
+      snmp_community,
+      snmp_port,
+      snmp_version,
+      authenV3
+    );
 
     const oids = Object.values(SYSTEM_DETAIL_OIDS);
     const result = await new Promise<any[]>((resolve, reject) => {
@@ -777,13 +795,24 @@ export async function fetchDetailHost(
 export async function fetchInterfaceHost(
   ip_address: string,
   community: string,
-  port: number,
-  version: string
+  port: string,
+  version: string,
+  authenV3: {
+    username: string;
+    securityLevel: string;
+    authenProtocol: string;
+    authenPass: string;
+    privacyProtocol: string;
+    privacyPass: string;
+  }
 ): Promise<InterfaceItem[]> {
-  const session = snmp.createSession(ip_address, community, {
+  const session = await createSessionSNMP(
+    ip_address,
+    community,
     port,
-    version: getSnmpVersion(version),
-  });
+    version,
+    authenV3
+  );
   const oid = "1.3.6.1.2.1.2.2";
   const columns = [1, 2, 3, 4, 5, 7, 8];
 
@@ -867,12 +896,93 @@ export async function fetchInterfaceHost(
   }
 }
 
+async function createSessionSNMP(
+  ip_address: string,
+  snmp_community: string,
+  snmp_port: string,
+  snmp_version: string,
+  authenV3: IauthenV3
+): Promise<snmp.Session> {
+  const option = {
+    port: snmp_port,
+    version: getSnmpVersion(snmp_version as string),
+    timeout: 5000, // 5 seconds timeout
+    retries: 1,
+  };
+
+  let session: snmp.Session;
+
+  if (snmp_version === "SNMPv3") {
+    if (authenV3.securityLevel === "noAuthNoPriv") {
+      session = snmp.createV3Session(
+        ip_address,
+        {
+          name: authenV3.username,
+        },
+        option
+      );
+    } else if (authenV3.securityLevel === "authNoPriv") {
+      session = snmp.createV3Session(
+        ip_address,
+        {
+          name: authenV3.username,
+          lavel: getSnmpSecurityLevel(authenV3.securityLevel),
+          authProtocol: getSnmpAuthProtocol(authenV3.authenProtocol),
+          authKey: authenV3.authenPass,
+        },
+        option
+      );
+    } else {
+      session = snmp.createV3Session(
+        ip_address,
+        {
+          name: authenV3.username,
+          lavel: getSnmpSecurityLevel(authenV3.securityLevel),
+          authProtocol: getSnmpAuthProtocol(authenV3.authenProtocol),
+          authKey: authenV3.authenPass,
+          privProtocol: getSnmpPrivacyProtocol(authenV3.privacyProtocol),
+          privKey: authenV3.privacyPass,
+        },
+        option
+      );
+    }
+  } else {
+    session = snmp.createSession(ip_address, snmp_community, option);
+  }
+
+  return session;
+}
+
 function getSnmpVersion(version: string): number {
   const SNMP_VERSIONS: { [key: string]: number } = {
-    v1: snmp.Version1,
-    v2: snmp.Version2c,
-    v2c: snmp.Version2c,
-    v3: snmp.Version3,
+    SNMPv1: snmp.Version1,
+    SNMPv2: snmp.Version2c,
+    SNMPv3: snmp.Version3,
   };
-  return SNMP_VERSIONS[version.toLowerCase()] || snmp.Version2c;
+  return SNMP_VERSIONS[version] || snmp.Version2c;
+}
+
+function getSnmpSecurityLevel(level: string): number {
+  const SNMP_SecurityLevel: { [key: string]: number } = {
+    noAuthNoPriv: snmp.SecurityLevel.noAuthNoPriv,
+    authNoPriv: snmp.SecurityLevel.authNoPriv,
+    authPriv: snmp.SecurityLevel.authPriv,
+  };
+  return SNMP_SecurityLevel[level] || snmp.AuthProtocolMD5;
+}
+
+function getSnmpAuthProtocol(protocol: string): number {
+  const SNMP_AuthProtocol: { [key: string]: number } = {
+    MD5: snmp.AuthProtocols.md5,
+    SHA: snmp.AuthProtocols.sha,
+  };
+  return SNMP_AuthProtocol[protocol] || snmp.AuthProtocolMD5;
+}
+
+function getSnmpPrivacyProtocol(protocol: string): number {
+  const SNMP_PrivacyProtocol: { [key: string]: number } = {
+    DES: snmp.PrivProtocols.des,
+    AES: snmp.PrivProtocols.aes,
+  };
+  return SNMP_PrivacyProtocol[protocol] || snmp.PrivProtocolDES;
 }
