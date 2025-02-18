@@ -92,6 +92,32 @@ const createTrigger = async (req: Request, res: Response) => {
       });
     }
 
+    if (expressionPart.duration) {
+      const expressionDuration = expressionPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
+    if (expressionRecoveryPart.duration) {
+      const expressionDuration = expressionRecoveryPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
     const items: [string, mongoose.Types.ObjectId][] = [];
     const addedItemNames = new Set<string>();
 
