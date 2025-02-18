@@ -13,7 +13,7 @@ interface IDashboard extends Document {
   isViewer: boolean;
 }
 
-const dashboardSchema = new Schema({
+const dashboardSchema: Schema<IDashboard> = new Schema({
   dashboard_name: { type: String, required: true },
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
