@@ -15,7 +15,7 @@ router.get("/", auth, getAllItem);
 
 router.post("/", createItem);
 
-router.get("/interface/", scanInterface);
+router.post("/interface/", scanInterface);
 
 router.put("/edit/:id", updateItem);
 
