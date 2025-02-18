@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 interface IDashboard extends Document {
   dashboard_name: string;
+  user_id: mongoose.Types.ObjectId;
   widget: [
     {
       index: number;
@@ -9,11 +10,16 @@ interface IDashboard extends Document {
       type: string;
     }
   ];
-  isAdmin: boolean;
+  isViewer: boolean;
 }
 
 const dashboardSchema = new Schema({
   dashboard_name: { type: String, required: true },
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   widget: [
     {
       _id: false,
@@ -22,6 +28,7 @@ const dashboardSchema = new Schema({
       type: { type: String, required: true },
     },
   ],
+  isViewer: { type: Boolean, default: false },
 });
 
 export default mongoose.model("Dashboard", dashboardSchema);
