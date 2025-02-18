@@ -3,32 +3,76 @@ import mongoose, { Schema } from "mongoose";
 interface IDashboard extends Document {
   dashboard_name: string;
   user_id: mongoose.Types.ObjectId;
-  widget: [
+  isDefault: {
+    type: Boolean;
+    default: false;
+  };
+  components: [
     {
-      index: number;
       id: string;
-      type: string;
+      position: number;
+      componentType: string;
+      graphSelection: {
+        graphID: string;
+      };
+      settings: Schema.Types.Mixed;
     }
   ];
-  isViewer: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const dashboardSchema: Schema<IDashboard> = new Schema({
-  dashboard_name: { type: String, required: true },
-  user_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  widget: [
-    {
-      _id: false,
-      index: { type: Number, required: true },
-      id: { type: String, required: true },
-      type: { type: String, required: true },
+const dashboardSchema: Schema<IDashboard> = new Schema(
+  {
+    dashboard_name: {
+      type: String,
+      required: true,
     },
-  ],
-  isViewer: { type: Boolean, default: false },
-});
+    user_id: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
+    components: [
+      {
+        id: {
+          type: String,
+          required: true,
+        },
+        position: {
+          type: Number,
+          required: true,
+        },
+        componentType: {
+          type: String,
+          required: true,
+          enum: [
+            "digitalClock",
+            "analogClock",
+            "table",
+            "graph",
+            "calendar",
+            "eventblock",
+          ],
+        },
+        graphSelection: {
+          graphId: String,
+        },
+        settings: {
+          type: Map,
+          of: Schema.Types.Mixed,
+          default: {},
+        },
+      },
+    ],
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: true },
+  }
+);
 
 export default mongoose.model("Dashboard", dashboardSchema);
