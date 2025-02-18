@@ -18,6 +18,7 @@ interface IDashboard extends Document {
       settings: Schema.Types.Mixed;
     }
   ];
+  isViewer: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -69,6 +70,10 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
         },
       },
     ],
+    isViewer: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: true },
