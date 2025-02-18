@@ -88,6 +88,7 @@ export const createHost = async (req: Request, res: Response) => {
       template_name,
       details,
       items,
+      authenV3,
     } = req.body;
 
     const requiredFields = [
@@ -95,7 +96,6 @@ export const createHost = async (req: Request, res: Response) => {
       "ip_address",
       "snmp_port",
       "snmp_version",
-      "snmp_community",
       "hostgroup",
     ];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
@@ -108,11 +108,40 @@ export const createHost = async (req: Request, res: Response) => {
       });
     }
 
+    if (snmp_version === "SNMPv2" || snmp_version === "SNMPv1") {
+      const reqForV2 = ["community"];
+
+      const missingFields = reqForV2.filter((field) => !req.body[field]);
+
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          status: "fail",
+          message: "Missing required fields.",
+          requiredFields: missingFields,
+        });
+      }
+    }
+
+    if (snmp_version === "SNMPv3") {
+      const reqForV3 = ["authenV3"];
+
+      const missingFields = reqForV3.filter((field) => !req.body[field]);
+
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          status: "fail",
+          message: "Missing required fields.",
+          requiredFields: missingFields,
+        });
+      }
+    }
+
     const detailsHost = await fetchDetailHost(
       ip_address,
       snmp_community,
       snmp_port,
-      snmp_version
+      snmp_version,
+      authenV3
     );
 
     const newHost = new Host({
@@ -126,6 +155,7 @@ export const createHost = async (req: Request, res: Response) => {
       interfaces: detailsHost?.interfaces,
       details: { ...details, ...detailsHost?.details },
       status: detailsHost?.status,
+      authenV3,
     });
 
     await newHost.save({ session });
