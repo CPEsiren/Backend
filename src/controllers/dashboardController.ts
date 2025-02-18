@@ -97,9 +97,14 @@ export async function getDashboards(req: Request, res: Response) {
 
 export async function createDashboard(req: Request, res: Response) {
   try {
-    const { dashboard_name, user_id, widget, isViewer } = req.body;
+    const { dashboard_name, user_id, isDefault, components } = req.body;
 
-    const requiredFields = ["dashboard_name", "user_id", "widget", "isViewer"];
+    const requiredFields = [
+      "dashboard_name",
+      "user_id",
+      "isDefault",
+      "components",
+    ];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
     if (missingFields.length > 0) {
@@ -113,8 +118,8 @@ export async function createDashboard(req: Request, res: Response) {
     const newDashboard = new Dashboard({
       dashboard_name,
       user_id,
-      widget,
-      isViewer,
+      isDefault,
+      components,
     });
 
     const savedDashboard = await newDashboard.save();
@@ -129,12 +134,13 @@ export async function createDashboard(req: Request, res: Response) {
 
 export async function updateDashboard(req: Request, res: Response) {
   try {
-    const { dashboard_name, widget, isAdmin } = req.body;
+    const { dashboard_name, user_id, isDefault, components } = req.body;
 
     const dashboard = await Dashboard.findByIdAndUpdate(req.params.id, {
       dashboard_name,
-      widget,
-      isAdmin,
+      user_id,
+      isDefault,
+      components,
     });
 
     if (!dashboard) {
