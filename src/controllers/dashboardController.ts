@@ -95,9 +95,46 @@ export async function getDashboards(req: Request, res: Response) {
   }
 }
 
+export async function getDashboardsUser(req: Request, res: Response) {
+  try {
+    const dashboards = await Dashboard.find({ user_id: req.params.id });
+
+    if (!dashboards) {
+      return res
+        .status(404)
+        .json({ status: "fail", error: "No dashboards found" });
+    }
+
+    res.status(200).json({ status: "success", dashboards });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: "Failed to fetch dashboards" });
+  }
+}
+
+export async function getDashboardsViewer(req: Request, res: Response) {
+  try {
+    const dashboards = await Dashboard.find({ isViewer: true });
+
+    if (!dashboards) {
+      return res
+        .status(404)
+        .json({ status: "fail", error: "No dashboards found" });
+    }
+
+    res.status(200).json({ status: "success", dashboards });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: "fail", error: "Failed to fetch dashboards" });
+  }
+}
+
 export async function createDashboard(req: Request, res: Response) {
   try {
-    const { dashboard_name, user_id, isDefault, components } = req.body;
+    const { dashboard_name, user_id, isDefault, components, isViewer } =
+      req.body;
 
     const requiredFields = [
       "dashboard_name",
@@ -120,6 +157,7 @@ export async function createDashboard(req: Request, res: Response) {
       user_id,
       isDefault,
       components,
+      isViewer,
     });
 
     const savedDashboard = await newDashboard.save();
@@ -134,13 +172,15 @@ export async function createDashboard(req: Request, res: Response) {
 
 export async function updateDashboard(req: Request, res: Response) {
   try {
-    const { dashboard_name, user_id, isDefault, components } = req.body;
+    const { dashboard_name, user_id, isDefault, components, isViewer } =
+      req.body;
 
     const dashboard = await Dashboard.findByIdAndUpdate(req.params.id, {
       dashboard_name,
       user_id,
       isDefault,
       components,
+      isViewer,
     });
 
     if (!dashboard) {
