@@ -6,7 +6,7 @@ import {
 import { fetchInterfaceHost } from "../services/snmpService";
 import { Request, Response } from "express";
 import Item from "../models/Item";
-import Host from "../models/Host";
+import Host, { IauthenV3 } from "../models/Host";
 import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
@@ -225,21 +225,31 @@ export const updateItem = async (req: Request, res: Response) => {
 
 export const scanInterface = async (req: Request, res: Response) => {
   try {
-    const { ip_address, port, version, community } = req.query;
+    const { ip_address, port, version, community, authenV3 } = req.body;
 
-    if (!ip_address || !community || !port || !version) {
+    const requiredFields = [
+      "ip_address",
+      "port",
+      "version",
+      "community",
+      "authenV3",
+    ];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: ["ip_address", "community", "port", "version"],
+        requiredFields: missingFields,
       });
     }
 
     const interfaces = await fetchInterfaceHost(
       ip_address as string,
       community as string,
-      parseInt(port as string, 10),
-      version as string
+      port as string,
+      version as string,
+      authenV3
     );
 
     res.status(201).json({
