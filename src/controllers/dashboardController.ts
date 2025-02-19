@@ -133,15 +133,9 @@ export async function getDashboardsViewer(req: Request, res: Response) {
 
 export async function createDashboard(req: Request, res: Response) {
   try {
-    const { dashboard_name, user_id, isDefault, components, isViewer } =
-      req.body;
+    const { dashboard_name, user_id, components } = req.body;
 
-    const requiredFields = [
-      "dashboard_name",
-      "user_id",
-      "isDefault",
-      "components",
-    ];
+    const requiredFields = ["dashboard_name", "user_id", "components"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
     if (missingFields.length > 0) {
@@ -155,9 +149,7 @@ export async function createDashboard(req: Request, res: Response) {
     const newDashboard = new Dashboard({
       dashboard_name,
       user_id,
-      isDefault,
       components,
-      isViewer,
     });
 
     const savedDashboard = await newDashboard.save();
