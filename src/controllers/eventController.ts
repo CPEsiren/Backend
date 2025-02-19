@@ -18,11 +18,23 @@ const getEvent = async (req: Request, res: Response) => {
 
 const getEvents = async (req: Request, res: Response) => {
   try {
-    const events = await Event.find();
+    const events = await Event.find().lean().exec();
 
-    res.status(200).json({ message: "Events retrieved successfully", events });
+    if (!events.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No events found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Events retrieved successfully",
+      data: events,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Failed to retrieve events:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
