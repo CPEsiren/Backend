@@ -3,19 +3,13 @@ import mongoose, { Schema } from "mongoose";
 interface IDashboard extends Document {
   dashboard_name: string;
   user_id: mongoose.Types.ObjectId;
-  isDefault: {
-    type: Boolean;
-    default: false;
-  };
   components: [
     {
-      id: string;
       position: number;
       componentType: string;
       graphSelection: {
         graphID: string;
       };
-      settings: Schema.Types.Mixed;
     }
   ];
   isViewer: boolean;
@@ -34,16 +28,8 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
       ref: "User",
       required: true,
     },
-    isDefault: {
-      type: Boolean,
-      default: false,
-    },
     components: [
       {
-        id: {
-          type: String,
-          required: true,
-        },
         position: {
           type: Number,
           required: true,
@@ -62,11 +48,6 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
         },
         graphSelection: {
           graphId: String,
-        },
-        settings: {
-          type: Map,
-          of: Schema.Types.Mixed,
-          default: {},
         },
       },
     ],
