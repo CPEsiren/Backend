@@ -4,41 +4,38 @@ import mongoose from "mongoose";
 
 export const getAllTemplate = async (req: Request, res: Response) => {
   try {
-    const template = await Template.find().lean().exec();
+    const templates = await Template.find().select("-__v").lean().exec();
 
-    if (!template.length) {
+    if (templates.length === 0) {
       return res.status(404).json({
         status: "fail",
-        message: "No template found.",
+        message: "No templates found.",
       });
     }
 
     res.status(200).json({
       status: "success",
       message: "Template fetched successfully.",
-      data: template,
+      data: templates,
     });
   } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching template.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+    console.error("Error fetching templates:", err);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const createTemplate = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const { template_name, items, description } = req.body;
 
-    if (!template_name || !description) {
+    const requiredFields = ["template_name", "description"];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: ["name_template", "description"],
+        requiredFields: missingFields,
       });
     }
 
@@ -48,10 +45,7 @@ export const createTemplate = async (req: Request, res: Response) => {
       description,
     });
 
-    await newTemplate.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
+    await newTemplate.save();
 
     res.status(201).json({
       status: "success",
@@ -59,12 +53,8 @@ export const createTemplate = async (req: Request, res: Response) => {
       data: newTemplate,
     });
   } catch (error) {
-    await session.abortTransaction();
-    res.status(500).json({
-      status: "error",
-      message: "Error creating template.",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("Error creating template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -72,91 +62,80 @@ export const updateTemplate = async (req: Request, res: Response) => {
   try {
     const template_id = req.params.id;
 
-    if (!template_id) {
+    if (!mongoose.Types.ObjectId.isValid(template_id)) {
       return res.status(400).json({
         status: "fail",
-        message: "template ID is required to update an template.",
+        message: "Invalid template ID format.",
       });
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const updateFields = ["template_name", "items", "description"];
+    const updateData: { [key: string]: any } = {};
 
-    try {
-      const updatedItem = await Template.findByIdAndUpdate(
-        template_id,
-        { $set: req.body },
-        { new: true, session }
-      );
-
-      if (!updatedItem) {
-        throw new Error(`No template found with ID: ${template_id}`);
+    updateFields.forEach((field) => {
+      if (field in req.body) {
+        updateData[field] = req.body[field];
       }
-
-      await session.commitTransaction();
-      session.endSession();
-
-      const template = await Template.findById(updatedItem._id);
-
-      res.status(200).json({
-        status: "success",
-        message: `Template with ID: [${updatedItem.template_name}] of template [${template?.template_name}] updated successfully.`,
-        data: updateTemplate,
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw error;
-    }
-  } catch (error) {
-    res.status(500).json({
-      status: "error",
-      message: "Failed to update template.",
-      error: error instanceof Error ? error.message : "Unknown error",
     });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "No valid update fields provided.",
+      });
+    }
+
+    const updatedTemplate = await Template.findByIdAndUpdate(
+      template_id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedTemplate) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No template found with ID: ${template_id}`,
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: `Template [${updatedTemplate.template_name}] updated successfully.`,
+      data: { template: updatedTemplate },
+    });
+  } catch (error) {
+    console.error("Error updating template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const deleteTemplate = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const templateId = req.params.id;
 
-    if (!templateId || !mongoose.Types.ObjectId.isValid(templateId)) {
+    if (!mongoose.Types.ObjectId.isValid(templateId)) {
       return res.status(400).json({
         status: "fail",
-        message: "Valid template ID is required.",
+        message: "Invalid template ID format.",
       });
     }
 
-    const deletedTemplate = await Template.findByIdAndDelete(
-      templateId
-    ).session(session);
+    const deletedTemplate = await Template.findByIdAndDelete(templateId).lean();
 
     if (!deletedTemplate) {
-      await session.abortTransaction();
       return res.status(404).json({
         status: "fail",
         message: "Template not found.",
       });
     }
 
-    await session.commitTransaction();
-    session.endSession();
-
     res.status(200).json({
       status: "success",
       message: "Template deleted successfully.",
-      data: deletedTemplate,
+      data: { template: deletedTemplate },
     });
   } catch (error) {
-    await session.abortTransaction();
-    res.status(500).json({
-      status: "error",
-      message: "Error deleting template.",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("Error deleting template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
