@@ -12,14 +12,28 @@ const getTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const trigger = await Trigger.findById(id);
-    if (!trigger) {
-      return res.status(404).json({ message: "Trigger not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid trigger ID format.",
+      });
     }
 
-    res.status(200).json(trigger);
+    const trigger = await Trigger.findById(id).select("-__v").lean().exec();
+    if (!trigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Trigger not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: trigger,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching trigger: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -44,15 +58,23 @@ const getTriggers = async (req: Request, res: Response) => {
     await Host.populate(data, {
       path: "host_id",
       model: "Host",
-      select: "hostname",
+      select: "hostname -_id",
     });
+
+    if (data.length === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No triggers found",
+      });
+    }
 
     res.status(200).json({
       status: "success",
       data,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching triggers: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -204,7 +226,14 @@ const createTrigger = async (req: Request, res: Response) => {
       trigger: newTrigger,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    await Trigger.findOneAndDelete({
+      trigger_name: req.body.trigger_name,
+      type: req.body.type,
+      host_id: req.body.host_id,
+      severity: req.body.severity,
+    });
+    console.error("Error creating trigger:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -284,10 +313,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       trigger,
     });
   } catch (error) {
-    res.status(500).json({
-      status: "fail",
-      message: "Internal server error",
-    });
+    console.error("Error updating trigger: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -295,16 +322,30 @@ const deleteTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Find the trigger and delete it
-    const trigger = await Trigger.findByIdAndDelete(id);
-
-    if (!trigger) {
-      return res.status(404).json({ message: "Trigger not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid trigger ID format.",
+      });
     }
 
-    res.status(200).json({ message: "Trigger deleted successfully" });
+    const deletedTrigger = await Trigger.findByIdAndDelete(id).lean();
+
+    if (!deletedTrigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Trigger not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: `Trigger [${deletedTrigger.trigger_name}] deleted successfully`,
+      data: { trigger: deletedTrigger },
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error deleting trigger:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
