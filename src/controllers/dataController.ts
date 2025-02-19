@@ -34,18 +34,6 @@ export const getAllData = async (req: Request, res: Response) => {
       },
     ]);
 
-    await Data.populate(data, {
-      path: "items.item_id",
-      model: "Item",
-      select: "_id item_name oid type unit",
-    });
-
-    await Data.populate(data, {
-      path: "_id",
-      model: "Host",
-      select: "hostname",
-    });
-
     if (!data.length) {
       return res.status(404).json({
         status: "fail",
@@ -53,27 +41,41 @@ export const getAllData = async (req: Request, res: Response) => {
       });
     }
 
+    await Data.populate(data, [
+      {
+        path: "items.item_id",
+        model: "Item",
+        select: "_id item_name oid type unit",
+      },
+      {
+        path: "_id",
+        model: "Host",
+        select: "hostname",
+      },
+    ]);
+
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully.",
       data: data,
     });
-  } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching data.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const getBetween = async (req: Request, res: Response) => {
   const { startTime, endTime, host_id } = req.query;
 
-  if (!startTime || !endTime || !host_id) {
+  const requiredFields = ["startTime", "endTime", "host_id"];
+  const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+  if (missingFields.length > 0) {
     return res.status(400).json({
       status: "fail",
-      message: "Start time and end time are required.",
+      message: "Missing required fields.",
+      requiredFields: missingFields,
     });
   }
 
@@ -123,36 +125,33 @@ export const getBetween = async (req: Request, res: Response) => {
       },
     ]);
 
-    await Data.populate(data, {
-      path: "items.item_id",
-      model: "Item",
-      select: "_id item_name oid type unit",
-    });
-
-    await Data.populate(data, {
-      path: "_id",
-      model: "Host",
-      select: "hostname",
-    });
-
     if (!data.length) {
       return res.status(404).json({
         status: "fail",
         message: "No data found between the specified times.",
-        data: data,
       });
     }
+
+    await Data.populate(data, [
+      {
+        path: "items.item_id",
+        model: "Item",
+        select: "_id item_name oid type unit",
+      },
+      {
+        path: "_id",
+        model: "Host",
+        select: "hostname",
+      },
+    ]);
 
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully for the specified time range.",
       data: data,
     });
-  } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching data between times.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+  } catch (error) {
+    console.error("Error fetching data between times:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
