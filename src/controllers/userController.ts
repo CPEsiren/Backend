@@ -6,35 +6,52 @@ const getUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findById(id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
+    }
+
+    const user = await User.findById(id).select("-password -__v").lean().exec();
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
     }
 
     res.status(200).json({
+      status: "success",
       message: "User retrieved successfully",
       user,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error retrieving user: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select("-password -__v").lean().exec();
 
     if (users.length === 0) {
-      return res.status(404).json({ message: "No users found" });
+      return res.status(404).json({
+        status: "fail",
+        message: "No users found",
+      });
     }
 
     res.status(200).json({
+      status: "success",
       message: "Users retrieved successfully",
       users,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error retrieving users: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -42,12 +59,20 @@ const getRole = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findById(id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
+    }
+
+    const user = await User.findById(id).select("role").lean().exec();
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ status: "warning", message: "User not found" });
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
     }
 
     res.status(200).json({
@@ -56,62 +81,57 @@ const getRole = async (req: Request, res: Response) => {
       role: user.role,
     });
   } catch (error) {
+    console.error("Error retrieving user role: ", error);
     res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const updateUserRole = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const user_id = req.params.id;
+    const { id } = req.params;
+    const { role } = req.body;
 
-    if (!user_id || !mongoose.Types.ObjectId.isValid(user_id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         status: "fail",
-        message: "Valid user ID is required to update a user.",
+        message: "Invalid user ID format.",
       });
     }
 
-    const { email, role } = req.body;
-
-    const updatedUser = await User.findByIdAndUpdate(
-      user_id,
-      {
-        role,
-      },
-      { new: true, session }
-    );
-
-    if (!updatedUser) {
-      throw new Error(`No user found with ID: ${user_id}`);
+    if (!role) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Role is required to update a user.",
+      });
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { role },
+      { new: true, runValidators: true, select: "username role" }
+    ).lean();
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
 
     res.status(200).json({
       status: "success",
-      message: `User [${updatedUser.username}] updated successfully.`,
-      data: updatedUser,
+      message: `User [${updatedUser.username}] role updated successfully.`,
+      data: {
+        user: {
+          id: updatedUser._id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+        },
+      },
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    if (error instanceof Error && error.message.startsWith("No user found")) {
-      return res.status(404).json({
-        status: "fail",
-        message: error.message,
-      });
-    }
-
-    res.status(500).json({
-      status: "error",
-      message: "Failed to update user.",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("Error updating user role: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -119,16 +139,35 @@ const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findByIdAndDelete(id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
     }
 
-    res
-      .status(200)
-      .json({ message: `User [${user.username}] deleted successfully` });
+    const deletedUser = await User.findByIdAndDelete(id)
+      .select("username")
+      .lean();
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: `User [${deletedUser.username}] deleted successfully`,
+      data: {
+        deletedUserId: id,
+        deletedUsername: deletedUser.username,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error deleting user: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
