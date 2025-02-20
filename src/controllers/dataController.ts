@@ -69,7 +69,7 @@ export const getBetween = async (req: Request, res: Response) => {
   const { startTime, endTime, host_id } = req.query;
 
   const requiredFields = ["startTime", "endTime", "host_id"];
-  const missingFields = requiredFields.filter((field) => !req.body[field]);
+  const missingFields = requiredFields.filter((field) => !req.query[field]);
 
   if (missingFields.length > 0) {
     return res.status(400).json({
