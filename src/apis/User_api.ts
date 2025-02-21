@@ -6,17 +6,18 @@ import {
   getRole,
   updateUserRole,
 } from "../controllers/userController";
+import { auth, authAdmin } from "../middleware/auth";
 
 const router = express.Router();
 
-router.get("/", getUsers);
+router.get("/", auth, getUsers);
 
-router.get("/:id", getUser);
+router.get("/:id", auth, getUser);
 
-router.get("/role/:id", getRole);
+router.get("/role/:id", auth, getRole);
 
-router.put("/editrole/:id", updateUserRole);
+router.put("/editrole/:id", auth, updateUserRole);
 
-router.delete("/:id", deleteUser);
+router.delete("/:id", authAdmin, deleteUser);
 
 export default router;

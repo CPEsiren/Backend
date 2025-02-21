@@ -3,17 +3,18 @@ import {
   createTemplate,
   deleteTemplate,
   getAllTemplate,
-  updateTemplate
+  updateTemplate,
 } from "../controllers/templateController";
+import { authAdmin } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", getAllTemplate);
+router.get("/", authAdmin, getAllTemplate);
 
-router.post("/", createTemplate);
+router.post("/", authAdmin, createTemplate);
 
-router.put("/edit/:id", updateTemplate);
+router.put("/edit/:id", authAdmin, updateTemplate);
 
-router.delete("/:id", deleteTemplate);
+router.delete("/:id", authAdmin, deleteTemplate);
 
 export default router;

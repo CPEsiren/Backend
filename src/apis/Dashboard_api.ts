@@ -8,22 +8,22 @@ import {
   getDashboardsViewer,
   updateDashboard,
 } from "../controllers/dashboardController";
-import { auth } from "../middleware/auth";
+import { auth, authAdmin } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/count", getDashboardCounts);
+router.get("/count", auth, getDashboardCounts);
 
 router.get("/", auth, getDashboards);
 
-router.get("/viewer", getDashboardsViewer);
+router.get("/viewer", auth, getDashboardsViewer);
 
-router.get("/user/:id", getDashboardsUser);
+router.get("/user/:id", authAdmin, getDashboardsUser);
 
-router.post("/", createDashboard);
+router.post("/", authAdmin, createDashboard);
 
-router.put("/:id", updateDashboard);
+router.put("/:id", authAdmin, updateDashboard);
 
-router.delete("/:id", deleteDashboard);
+router.delete("/:id", authAdmin, deleteDashboard);
 
 export default router;

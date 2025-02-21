@@ -6,17 +6,18 @@ import {
   getHostById,
   updateHost,
 } from "../controllers/hostController";
+import { auth, authAdmin } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", getAllHosts);
+router.get("/", authAdmin, getAllHosts);
 
-router.get("/:id", getHostById);
+router.get("/:id", authAdmin, getHostById);
 
-router.post("/", createHost);
+router.post("/", authAdmin, createHost);
 
-router.put("/edit/:id", updateHost);
+router.put("/edit/:id", authAdmin, updateHost);
 
-router.delete("/:id", deleteHost);
+router.delete("/:id", authAdmin, deleteHost);
 
 export default router;

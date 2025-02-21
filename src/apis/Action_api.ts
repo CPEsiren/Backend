@@ -6,17 +6,18 @@ import {
   deleteAction,
   getActionUser,
 } from "../controllers/actionController";
+import { authAdmin } from "../middleware/auth";
 
 const router = express.Router();
 
-router.get("/", getActions);
+router.get("/", authAdmin, getActions);
 
-router.get("/user/:user_id", getActionUser);
+router.get("/user/:user_id", authAdmin, getActionUser);
 
-router.post("/", createAction);
+router.post("/", authAdmin, createAction);
 
-router.put("/:id", updateAction);
+router.put("/:id", authAdmin, updateAction);
 
-router.delete("/:id", deleteAction);
+router.delete("/:id", authAdmin, deleteAction);
 
 export default router;
