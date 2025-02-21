@@ -146,11 +146,33 @@ export const createHost = async (req: Request, res: Response) => {
     await newHost.save();
 
     if (Array.isArray(items) && items.length > 0) {
-      const itemDocuments = items.map((item) => ({
+      const item = items.map((item) => ({
         ...item,
         type: item.type.toLowerCase(),
         host_id: newHost._id,
       }));
+
+      const itemDocuments = [
+        {
+          item_name: "Total Inbound Traffic ",
+          oid: "1.3.6.1.2.1.2.2.1.10",
+          type: "counter",
+          unit: "bit",
+          interval: 60,
+          isOverview: true,
+          host_id: newHost._id,
+        },
+        {
+          item_name: "Total Outbound Traffic ",
+          oid: "1.3.6.1.2.1.2.2.1.10",
+          type: "counter",
+          unit: "bit",
+          interval: 60,
+          isOverview: true,
+          host_id: newHost._id,
+        },
+        ...item,
+      ];
 
       const insertedItems = await Item.insertMany(itemDocuments);
       insertedItems.forEach((item) => scheduleItem(item));
