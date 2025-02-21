@@ -125,13 +125,6 @@ export const getBetween = async (req: Request, res: Response) => {
       },
     ]);
 
-    if (!data.length) {
-      return res.status(404).json({
-        status: "fail",
-        message: "No data found between the specified times.",
-      });
-    }
-
     await Data.populate(data, [
       {
         path: "items.item_id",
@@ -144,6 +137,13 @@ export const getBetween = async (req: Request, res: Response) => {
         select: "hostname",
       },
     ]);
+
+    if (!data.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No data found between the specified times.",
+      });
+    }
 
     res.status(200).json({
       status: "success",
