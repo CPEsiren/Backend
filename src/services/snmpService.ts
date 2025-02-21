@@ -1,23 +1,17 @@
 import {
   calculateLogic,
   evaluateHost,
-  handleAction,
   handleHasTrigger,
   handleNotHasTrigger,
   hasTrigger,
-  sendNotification,
 } from "./alertService";
-import Action from "../models/Action";
-import { createTime } from "../middleware/Time";
-import Host, { IauthenV3, IHost } from "../models/Host";
+import Host, { IauthenV3 } from "../models/Host";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";
-import Event from "../models/Event";
-import Media from "../models/Media";
 import mongoose from "mongoose";
 import snmp from "net-snmp";
 import Trigger from "../models/Trigger";
-import { auth } from "google-auth-library";
+import { start } from "repl";
 
 interface InterfaceItem {
   item_name: string;
@@ -38,10 +32,11 @@ const statusInterface: { [key: number]: string } = {
 };
 
 export async function fetchAndStoreSnmpDataForItem(item: IItem) {
-  if (!item.isBandwidth) {
+  if (!item.isBandwidth && !item.isOverview) {
     try {
       // Find the host associated with this item
       const host = await Host.findById(item.host_id);
+
       if (!host) {
         return;
       }
@@ -78,7 +73,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Get the current value
         const currentValue = parseFloat(result.value.toString());
-        const currentTimestamp = new Date(await createTime());
+        const currentTimestamp = new Date();
 
         let value: number = 0;
         let deltaValue = 0;
@@ -171,6 +166,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
                   current_value: bandwidthUtilization.toFixed(2),
                 });
                 await bandwidthData.save();
+                // console.log(
+                //   `[${new Date().toLocaleString()}] Store Data ${
+                //     bandwidthData.metadata.item_id
+                //   } : ${bandwidthData.value}`
+                // );
                 await hasTrigger(
                   host._id as mongoose.Types.ObjectId,
                   itembandwidth
@@ -199,12 +199,133 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Save the data to the database
         await newData.save();
+        // console.log(
+        //   `[${new Date().toLocaleString()}] Store Data ${
+        //     newData.metadata.item_id
+        //   } : ${newData.value}`
+        // );
 
         await hasTrigger(host._id as mongoose.Types.ObjectId, item);
       }
     } catch (error) {
-      console.log("fetchAndStoreSnmpDataForItem : ", error);
+      console.log(
+        `[${new Date().toLocaleString()}] fetchAndStoreSnmpDataForItem ${
+          item.item_name
+        } : ${error}`
+      );
     }
+  }
+}
+
+export async function fetchAndStoreTotalTraffic(item: IItem) {
+  try {
+    const host = await Host.findById(item.host_id);
+
+    if (!host) {
+      return;
+    }
+
+    if (host.status === 1) {
+      const session = await createSessionSNMP(
+        host.ip_address,
+        host.snmp_community,
+        host.snmp_port,
+        host.snmp_version,
+        host.authenV3
+      );
+
+      const oid = "1.3.6.1.2.1.2.2";
+      const columns = [1, 7];
+
+      const table: snmp.TableEntry[] = await new Promise((resolve, reject) => {
+        session.tableColumns(oid, columns, 1000, (error: any, table: any) => {
+          if (error) reject(error);
+          else resolve(table);
+        });
+      });
+
+      const activeInterfaces = Object.entries(table).filter(
+        ([, row]) => row[7] === 1
+      );
+
+      const oids: string[] = [];
+
+      for (const [index, row] of activeInterfaces) {
+        const interfaceIndex = parseInt(index, 10);
+
+        oids.push(`${item.oid}.${interfaceIndex}`);
+      }
+
+      const result = await new Promise<any>((resolve, reject) => {
+        session.get(oids, (error: any, varbinds: any) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(varbinds);
+          }
+        });
+      });
+
+      session.close();
+
+      if (snmp.isVarbindError(result)) {
+        return;
+      }
+
+      const sum = result.reduce((total: number, varbind: any) => {
+        if (!snmp.isVarbindError(varbind)) {
+          total += parseFloat(varbind.value.toString());
+        }
+        return total;
+      }, 0);
+
+      const currentValue = parseFloat(sum.toString());
+      const currentTimestamp = new Date();
+
+      let value: number = 0;
+      let deltaValue = 0;
+      let changePerSecond: number = 0;
+
+      const latestData = await Data.findOne({
+        "metadata.item_id": item._id,
+        "metadata.host_id": host._id,
+      }).sort({ timestamp: -1 });
+
+      if (latestData) {
+        const previousValue = latestData.current_value;
+        const previousTimestamp = new Date(latestData.timestamp as Date);
+
+        deltaValue = currentValue - previousValue;
+
+        const timeDifferenceInSeconds =
+          (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
+
+        changePerSecond = (deltaValue * 8) / timeDifferenceInSeconds;
+
+        value = changePerSecond;
+      }
+
+      const newData = new Data({
+        metadata: {
+          item_id: item._id,
+          host_id: host._id,
+          isBandwidth: item.isBandwidth,
+        },
+        timestamp: currentTimestamp,
+        value: value,
+        current_value: currentValue,
+      });
+
+      await newData.save();
+
+      await hasTrigger(host._id as mongoose.Types.ObjectId, item);
+    }
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] fetchAndStoreTotalTraffic ${
+        item.item_name
+      } : ${error}`
+    );
   }
 }
 
@@ -253,7 +374,11 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
           [oid_admin, oid_oper],
           async (error: any, varbinds: any) => {
             if (error || snmp.isVarbindError(varbinds[0])) {
-              console.log("checkInterfaceStatus : ", error);
+              console.log(
+                `[${new Date().toLocaleString()}] checkInterfaceStatus ${
+                  iface.interface_name
+                } : ${error}`
+              );
             } else {
               iface.interface_Adminstatus = statusInterface[varbinds[0].value];
               iface.interface_Operstatus = statusInterface[varbinds[1].value];
@@ -265,8 +390,16 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
         const new_admin = iface.interface_Adminstatus;
         const new_oper = iface.interface_Operstatus;
 
+        // if (oid_admin === "1.3.6.1.2.1.2.2.1.7.10113") {
+        //   console.log(old_admin, new_admin);
+        // }
+
         if (old_admin !== new_admin) {
-          console.log(`old ${old_admin} to new ${new_admin}`);
+          console.log(
+            `[${new Date().toLocaleString()}] The old admin status of ${
+              iface.interface_name
+            } : ${old_admin} --> The new admin status : ${new_admin}`
+          );
           triggerAdmin.forEach(async (trigger) => {
             const isTrigger = await evaluateHost(trigger, adminValue);
             trigger.logicExpression[0] = isTrigger.result ? "true" : "false";
@@ -289,7 +422,11 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
             }
           });
         } else if (old_oper !== new_oper) {
-          console.log(`old ${old_oper} to new ${new_oper}`);
+          console.log(
+            `[${new Date().toLocaleString()}] The old oper status of ${
+              iface.interface_name
+            } : ${old_oper} --> The new oper status : ${new_oper}`
+          );
           triggerOper.forEach(async (trigger) => {
             const isTrigger = await evaluateHost(trigger, operValue);
             trigger.logicExpression[0] = isTrigger.result ? "true" : "false";
@@ -355,9 +492,12 @@ export async function checkSnmpConnection(host_id: string) {
       });
 
       if (error || snmp.isVarbindError(varbinds[0])) {
-        await Host.findByIdAndUpdate(host_id, {
+        const host = await Host.findByIdAndUpdate(host_id, {
           status: 0,
         });
+
+        console.log(`Host ${host?.hostname} is down.`);
+
         if (triggers) {
           triggers.forEach(async (trigger) => {
             const isTrigger = await evaluateHost(trigger, 0);
@@ -854,7 +994,7 @@ export async function fetchInterfaceHost(
     });
 
     const activeInterfaces = Object.entries(table).filter(
-      ([, row]) => row[8] === 1
+      ([, row]) => row[7] === 1
     );
 
     const interfaceItems: InterfaceItem[] = [];
