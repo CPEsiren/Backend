@@ -14,19 +14,14 @@ export const loginUser = async (req: Request, res: Response) => {
 
     let user = await User.findOneAndUpdate(
       { email: userInfo.email },
-      { token },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    if (!user) {
-      user = new User({
+      {
         username: userInfo.name,
         email: userInfo.email,
         picture: userInfo.picture,
         token,
-      });
-      await user.save();
-    }
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
 
     res.status(200).json({
       message: `User [${user.username}] logged in successfully`,
