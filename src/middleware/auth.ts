@@ -39,7 +39,10 @@ export const authAdmin = async (
   try {
     const userInfo = await verifyToken(token);
 
-    const user = await User.findOne({ email: userInfo?.email, role: "admin" });
+    const user = await User.findOne({
+      email: userInfo?.email,
+      role: { $in: ["admin", "superadmin"] },
+    });
 
     if (!user)
       return res
