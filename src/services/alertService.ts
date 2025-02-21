@@ -76,6 +76,12 @@ export async function hasTrigger(
       trigger.isExpressionValid = isTriggered;
       const newIsExpressionValid = isTriggered;
 
+      console.log(
+        `[${new Date().toLocaleString()}] Trigger ${
+          trigger.trigger_name
+        } status : ${isTriggered}`
+      );
+
       if (trigger.ok_event_generation === "recovery expression") {
         const parsedRecoveryExpression = parseExpressionDetailed(
           trigger.recovery_expression
@@ -156,6 +162,7 @@ export async function hasTrigger(
             },
           }
         );
+
         if (isTriggered) {
           await handleHasTrigger(trigger, valueAlerted);
         }
@@ -310,7 +317,7 @@ export async function evaluateLogic(
       value = data[0].averageValue;
     } else {
       console.log(
-        "No data found for the given host_id, item_id, and time range"
+        `[${new Date().toLocaleString()}] No data found for the given host_id, item_id, and time range`
       );
       return {
         result: false,
@@ -343,7 +350,7 @@ export async function evaluateLogic(
       value = data[0].minValue;
     } else {
       console.log(
-        "No data found for the given host_id, item_id, and time range"
+        `[${new Date().toLocaleString()}] No data found for the given host_id, item_id, and time range`
       );
       return {
         result: false,
@@ -376,7 +383,7 @@ export async function evaluateLogic(
       value = data[0].maxValue;
     } else {
       console.log(
-        "No data found for the given host_id, item_id, and time range"
+        `[${new Date().toLocaleString()}] No data found for the given host_id, item_id, and time range`
       );
       return {
         result: false,
@@ -384,7 +391,7 @@ export async function evaluateLogic(
       };
     }
   } else {
-    console.log("Invalid function name");
+    console.log(`[${new Date().toLocaleString()}] Invalid function name`);
   }
 
   switch (operator) {
@@ -438,6 +445,8 @@ export async function calculateLogic(input: string[]): Promise<boolean> {
   return result;
 }
 
+const schedules: { [key: string]: NodeJS.Timeout } = {};
+
 export async function handleHasTrigger(
   trigger: ITrigger,
   valueAlerted: number
@@ -445,22 +454,46 @@ export async function handleHasTrigger(
   try {
     const host = await Host.findOne({ _id: trigger.host_id });
     const hostname = host?.hostname ?? "Unknown Host"; // Provide a default value if host is null or undefined
-    const event = await Event.findOneAndUpdate(
-      { trigger_id: trigger._id, status: "PROBLEM" }, // Find existing
+
+    const existingEvent = await Event.findOne({
+      trigger_id: trigger._id,
+      status: "PROBLEM",
+    });
+
+    const updatedEvent = await Event.findOneAndUpdate(
+      { trigger_id: trigger._id, status: "PROBLEM" },
       {
         trigger_id: trigger._id,
-        type: "item",
+        type: trigger.type,
         severity: trigger.severity,
         hostname,
         status: "PROBLEM",
         value_alerted: valueAlerted,
         message: trigger.expression,
-      }, // Insert if not found
-      { upsert: true, new: true } // Upsert creates a new one if not found
+      },
+      { upsert: true, new: true }
     );
-    await handleAction(event, trigger);
+
+    const duration = 60 * 1000;
+
+    // Check if a new event was created or an existing one was updated
+    if (!existingEvent || !updatedEvent.equals(existingEvent)) {
+      console.log(
+        `[${new Date().toLocaleString()}] Event problem of trigger ${
+          trigger.trigger_name
+        }`
+      );
+      await handleAction(updatedEvent, trigger);
+      schedules[updatedEvent._id as string] = setInterval(async () => {
+        try {
+          await handleAction(updatedEvent, trigger);
+        } catch (error) {
+          console.error(`Interval Action Error`, error);
+        }
+      }, duration);
+    }
   } catch (error) {
-    console.log(error);
+    console.log(`[${new Date().toLocaleString()}] handleHasTrigger : ${error}`);
   }
 }
 export async function handleNotHasTrigger(trigger: ITrigger) {
@@ -480,7 +513,16 @@ export async function handleNotHasTrigger(trigger: ITrigger) {
       },
       { new: true }
     );
-    if (event) await handleAction(event, trigger);
+
+    clearInterval(schedules[event?._id as string]);
+    if (event) {
+      await handleAction(event, trigger);
+      console.log(
+        `[${new Date().toLocaleString()}] Event resolved of trigger ${
+          trigger.trigger_name
+        } by recovery expression`
+      );
+    }
   } else if (trigger.ok_event_generation === "expression") {
     const event = await Event.findOneAndUpdate(
       {
@@ -493,7 +535,16 @@ export async function handleNotHasTrigger(trigger: ITrigger) {
       },
       { new: true }
     );
-    if (event) await handleAction(event, trigger);
+
+    clearInterval(schedules[event?._id as string]);
+    if (event) {
+      console.log(
+        `[${new Date().toLocaleString()}] Event resolved of trigger ${
+          trigger.trigger_name
+        } by expression`
+      );
+      await handleAction(event, trigger);
+    }
   }
 }
 
@@ -501,6 +552,9 @@ export async function handleAction(event: IEvent, trigger: ITrigger) {
   const actions = await Action.find({ enabled: true });
 
   if (!actions) {
+    console.log(
+      `[${new Date().toLocaleString()}] No actions found or disabled`
+    );
     return;
   }
 
@@ -569,7 +623,9 @@ export async function sendNotification(
   );
 
   if (type === "email") {
-    console.log("Sending email...");
+    console.log(
+      `[${new Date().toLocaleString()}] Sending email by [${subject}]`
+    );
     recipients.forEach((recipient) => {
       // sendEmail(recipient, subject, body);
     });
