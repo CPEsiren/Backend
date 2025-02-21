@@ -8,10 +8,8 @@ export interface IItem extends Document {
   type: "counter" | "integer";
   unit: string;
   interval: number;
-  status: number;
-  createAt: Date;
-  updateAt: Date;
   isBandwidth: boolean;
+  isOverview: boolean;
 }
 
 const itemSchema: Schema<IItem> = new mongoose.Schema(
@@ -26,14 +24,14 @@ const itemSchema: Schema<IItem> = new mongoose.Schema(
     type: { type: String, required: true, enum: ["counter", "integer"] },
     unit: { type: String, required: true },
     interval: { type: Number, default: 10 },
-    status: { type: Number, default: 1 },
     isBandwidth: { type: Boolean, default: false },
+    isOverview: { type: Boolean, default: false },
   },
   {
     timestamps: { createdAt: "createAt", updatedAt: "updateAt" },
   }
 );
 
-// itemSchema.index({ host_id: 1, item_name: 1 }, { unique: true });
+itemSchema.index({ host_id: 1, item_name: 1 }, { unique: true });
 
 export default mongoose.model<IItem>("Item", itemSchema);
