@@ -28,7 +28,7 @@ export const createTemplate = async (req: Request, res: Response) => {
   try {
     const { template_name, items, description } = req.body;
 
-    const requiredFields = ["template_name", "description"];
+    const requiredFields = ["template_name"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
     if (missingFields.length > 0) {
