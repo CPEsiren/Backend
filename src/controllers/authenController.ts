@@ -18,6 +18,7 @@ export const loginUser = async (req: Request, res: Response) => {
         username: userInfo.name,
         email: userInfo.email,
         picture: userInfo.picture,
+        tokenExp: new Date(userInfo.exp * 1000),
         token,
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }

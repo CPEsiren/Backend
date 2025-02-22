@@ -5,9 +5,8 @@ export interface IUser extends Document {
   email: string;
   picture?: string;
   role: "superdamin" | "admin" | "viewer";
-  createdAt: Date;
-  isActive: boolean;
   token: string;
+  tokenExp: Date;
 }
 
 const UserSchema: Schema<IUser> = new Schema(
@@ -29,17 +28,17 @@ const UserSchema: Schema<IUser> = new Schema(
       enum: ["superadmin", "admin", "viewer"],
       default: "viewer",
     },
-    isActive: {
-      type: Boolean,
-      default: false,
-    },
     token: {
       type: String,
       required: true,
     },
+    tokenExp: {
+      type: Date,
+      required: true,
+    },
   },
   {
-    timestamps: { createdAt: "createdAt", updatedAt: false },
+    timestamps: { createdAt: true, updatedAt: true },
   }
 );
 
