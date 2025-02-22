@@ -10,7 +10,7 @@ const router = Router();
 
 router.get("/", auth, getAllData);
 
-router.get("/host/between", auth, getHostBetween);
+router.get("/between", auth, getHostBetween);
 
 router.get("/item/between", auth, getItemBetween);
 
