@@ -9,6 +9,7 @@ interface IDashboard extends Document {
       componentType: string;
       graphSelection: {
         itemId: mongoose.Types.ObjectId;
+        hostId: mongoose.Types.ObjectId;
       };
     }
   ];
@@ -50,6 +51,10 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
           itemId: {
             type: Schema.Types.ObjectId,
             ref: "Item",
+          },
+          hostId: {
+            type: Schema.Types.ObjectId,
+            ref: "Host",
           },
         },
       },
