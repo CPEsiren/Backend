@@ -13,6 +13,7 @@ interface IDashboard extends Document {
       };
     }
   ];
+  isDefault: boolean;
   isViewer: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -59,6 +60,10 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
         },
       },
     ],
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
     isViewer: {
       type: Boolean,
       default: false,
