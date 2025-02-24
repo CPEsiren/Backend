@@ -67,7 +67,7 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
         todoItems: [
           {
             id: {
-              type: Number,
+              type: String,
               required: true,
             },
             text: {
