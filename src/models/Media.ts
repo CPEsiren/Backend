@@ -5,8 +5,14 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IMedia extends Document {
   user_id: mongoose.Types.ObjectId;
   type: "email" | "line";
-  recipients: string[];
-  disciption: string;
+  recipient: {
+    name: string;
+    send_to: string;
+  };
+  problem_title: string;
+  problem_body: string;
+  recovery_title: string;
+  recovery_body: string;
   enabled: boolean;
   createdAt: Date;
 }
@@ -23,13 +29,31 @@ const MediaSchema: Schema<IMedia> = new Schema(
       enum: ["email", "line"],
       required: true,
     },
-    recipients: {
-      type: [String],
+    recipient: {
+      name: {
+        type: String,
+        required: true,
+      },
+      send_to: {
+        type: String,
+        required: true,
+      },
+    },
+    problem_title: {
+      type: String,
       required: true,
     },
-    disciption: {
+    problem_body: {
       type: String,
-      default: "",
+      required: true,
+    },
+    recovery_title: {
+      type: String,
+      required: true,
+    },
+    recovery_body: {
+      type: String,
+      required: true,
     },
     enabled: {
       type: Boolean,
@@ -43,5 +67,7 @@ const MediaSchema: Schema<IMedia> = new Schema(
     },
   }
 );
+
+MediaSchema.index({ recipient: 1 }, { unique: true });
 
 export default mongoose.model<IMedia>("Media", MediaSchema);
