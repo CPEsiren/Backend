@@ -20,7 +20,9 @@ const getMedia = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching media: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res
+      .status(500)
+      .json({ status: "fail", message: `Internal server error : ${error}` });
   }
 };
 
@@ -35,7 +37,10 @@ const getMediaUser = async (req: Request, res: Response) => {
       });
     }
 
-    const media = await Media.find({ user_id }).select("-__v").lean().exec();
+    const media = await Media.find({ user_id })
+      .select("-__v -recipient.send_to")
+      .lean()
+      .exec();
 
     if (media.length === 0) {
       return res.status(404).json({
@@ -50,15 +55,33 @@ const getMediaUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching user media: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res
+      .status(500)
+      .json({ status: "fail", message: `Internal server error : ${error}` });
   }
 };
 
 const createMedia = async (req: Request, res: Response) => {
   try {
-    const { user_id, type, recipients, disciption, enabled } = req.body;
+    const {
+      user_id,
+      type,
+      recipient,
+      problem_title,
+      problem_body,
+      recovery_title,
+      recovery_body,
+    } = req.body;
 
-    const requiredFields = ["user_id", "type", "recipients", "enabled"];
+    const requiredFields = [
+      "user_id",
+      "type",
+      "recipient",
+      "problem_title",
+      "problem_body",
+      "recovery_title",
+      "recovery_body",
+    ];
 
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
@@ -88,9 +111,11 @@ const createMedia = async (req: Request, res: Response) => {
     const newMedia = new Media({
       user_id,
       type,
-      recipients,
-      disciption,
-      enabled,
+      recipient,
+      problem_title,
+      problem_body,
+      recovery_title,
+      recovery_body,
     });
 
     await newMedia.save();
@@ -101,12 +126,6 @@ const createMedia = async (req: Request, res: Response) => {
       data: newMedia,
     });
   } catch (error) {
-    await Media.findOneAndDelete({
-      user_id: req.body.user_id,
-      type: req.body.type,
-      recipients: req.body.recipients,
-      disciption: req.body.disciption,
-    });
     console.error("Error creating media: ", error);
     res.status(500).json({ status: "fail", message: "Internal server error" });
   }
@@ -123,7 +142,13 @@ const updateMedia = async (req: Request, res: Response) => {
       });
     }
 
-    const updateFields = ["type", "recipients", "description", "enabled"];
+    const updateFields = [
+      "problem_title",
+      "problem_body",
+      "recovery_title",
+      "recovery_body",
+      "enabled",
+    ];
     const updateData: { [key: string]: any } = {};
 
     updateFields.forEach((field) => {
