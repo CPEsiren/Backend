@@ -1,22 +1,24 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface ITrend extends Document {
-  value_min: number;
-  value_max: number;
-  value_avg: number;
+  min_value: number;
+  max_value: number;
+  avg_value: number;
+  num_values: number;
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
     item_id: mongoose.Types.ObjectId;
-    item_type: string;
+    isBandwidth: boolean;
   };
 }
 
 const trendSchema: Schema<ITrend> = new mongoose.Schema(
   {
-    value_min: { type: Number, required: true },
-    value_max: { type: Number, required: true },
-    value_avg: { type: Number, required: true },
+    min_value: { type: Number, required: true },
+    max_value: { type: Number, required: true },
+    avg_value: { type: Number, required: true },
+    num_values: { type: Number, required: true },
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
@@ -29,7 +31,7 @@ const trendSchema: Schema<ITrend> = new mongoose.Schema(
         ref: "Item",
         required: true,
       },
-      item_type: { type: String },
+      isBandwidth: { type: Boolean, required: true },
     },
   },
   {
