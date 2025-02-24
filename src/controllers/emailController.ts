@@ -85,14 +85,14 @@ export const sendOTP = async (req: Request, res: Response) => {
 `;
 
     // send email
-    // const isSuccess = await sendEmail(
-    //   email,
-    //   "OTP for email verification",
-    //   htmlMessage
-    // );
-    // if (!isSuccess) {
-    //   throw new Error(`Failed to send ${email}.`);
-    // }
+    const isSuccess = await sendEmail(
+      email,
+      "OTP for email verification",
+      htmlMessage
+    );
+    if (!isSuccess) {
+      throw new Error(`Failed to send ${email}.`);
+    }
 
     res.status(200).json({
       status: "success",
