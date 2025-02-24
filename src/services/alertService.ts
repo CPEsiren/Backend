@@ -76,12 +76,6 @@ export async function hasTrigger(
       trigger.isExpressionValid = isTriggered;
       const newIsExpressionValid = isTriggered;
 
-      console.log(
-        `[${new Date().toLocaleString()}] Trigger ${
-          trigger.trigger_name
-        } status : ${isTriggered}`
-      );
-
       if (trigger.ok_event_generation === "recovery expression") {
         const parsedRecoveryExpression = parseExpressionDetailed(
           trigger.recovery_expression
@@ -164,12 +158,12 @@ export async function hasTrigger(
         );
 
         if (isTriggered) {
-          await handleHasTrigger(trigger, valueAlerted);
+          await handleHasTrigger(trigger, valueAlerted, item);
         }
       }
 
       if (!isTriggered) {
-        await handleNotHasTrigger(trigger);
+        await handleNotHasTrigger(trigger, item);
       }
     });
 
@@ -449,7 +443,8 @@ const schedules: { [key: string]: NodeJS.Timeout } = {};
 
 export async function handleHasTrigger(
   trigger: ITrigger,
-  valueAlerted: number
+  valueAlerted: number,
+  item: IItem | null
 ) {
   try {
     const host = await Host.findOne({ _id: trigger.host_id });
@@ -483,10 +478,10 @@ export async function handleHasTrigger(
           trigger.trigger_name
         }`
       );
-      await handleAction(updatedEvent, trigger);
+      await handleAction(updatedEvent, trigger, item);
       schedules[updatedEvent._id as string] = setInterval(async () => {
         try {
-          await handleAction(updatedEvent, trigger);
+          await handleAction(updatedEvent, trigger, item);
         } catch (error) {
           console.error(`Interval Action Error`, error);
         }
@@ -496,7 +491,10 @@ export async function handleHasTrigger(
     console.log(`[${new Date().toLocaleString()}] handleHasTrigger : ${error}`);
   }
 }
-export async function handleNotHasTrigger(trigger: ITrigger) {
+export async function handleNotHasTrigger(
+  trigger: ITrigger,
+  item: IItem | null
+) {
   if (
     trigger.ok_event_generation === "recovery expression" &&
     trigger.isRecoveryExpressionValid
@@ -516,7 +514,7 @@ export async function handleNotHasTrigger(trigger: ITrigger) {
 
     clearInterval(schedules[event?._id as string]);
     if (event) {
-      await handleAction(event, trigger);
+      await handleAction(event, trigger, item);
       console.log(
         `[${new Date().toLocaleString()}] Event resolved of trigger ${
           trigger.trigger_name
@@ -543,12 +541,16 @@ export async function handleNotHasTrigger(trigger: ITrigger) {
           trigger.trigger_name
         } by expression`
       );
-      await handleAction(event, trigger);
+      await handleAction(event, trigger, item);
     }
   }
 }
 
-export async function handleAction(event: IEvent, trigger: ITrigger) {
+export async function handleAction(
+  event: IEvent,
+  trigger: ITrigger,
+  item: IItem | null
+) {
   const actions = await Action.find({ enabled: true });
 
   if (!actions) {
@@ -562,7 +564,7 @@ export async function handleAction(event: IEvent, trigger: ITrigger) {
     action.media_ids.forEach(async (media_id) => {
       const media = await Media.findOne({ _id: media_id, enabled: true });
       if (media) {
-        await sendNotification(media, action, event, trigger);
+        await sendNotification(media, action, event, trigger, item);
       }
     });
   });
@@ -571,10 +573,11 @@ export async function sendNotification(
   media: IMedia,
   action: IAction,
   event: IEvent,
-  trigger: ITrigger
+  trigger: ITrigger,
+  item: IItem | null
 ) {
   const host = await Host.findOne({ _id: trigger.host_id });
-  const { type, recipients } = media;
+  const { type, recipient } = media;
   const { status } = event;
   let subject: string = "";
   let body: string = "";
@@ -589,8 +592,6 @@ export async function sendNotification(
   }
 
   const replacement = {
-    //General
-    "{DATE}": new Date().toLocaleString(),
     //Trigger
     "{TRIGGER.NAME}": trigger.trigger_name,
     "{TRIGGER.EXPRESSION}": trigger.expression,
@@ -600,16 +601,14 @@ export async function sendNotification(
     //Host
     "{HOST.NAME}": host?.hostname ?? event.hostname,
     "{HOST.IP}": host?.ip_address ?? "Unknown IP",
+    //Item
+    "{ITEM.NAME}": item?.item_name ?? "Unknown Item",
+    "{ITEM.VALUE}": event.value_alerted,
     //Event
-    "{EVENT.ID}": event._id,
-    "{EVENT.SEVERITY}": event.severity,
     "{EVENT.STATUS}": event.status,
     "{EVENT.HOSTNAME}": event.hostname,
     "{EVENT.LASTVALUE}": event.value_alerted,
-    "{EVENT.PROBLEM.DATE}": event.createdAt.toDateString(),
-    "{EVENT.PROBLEM.TIME}": event.createdAt.toLocaleTimeString(),
-    "{EVENT.RECOVERY.DATE}": event.updatedAt.toDateString(),
-    "{EVENT.RECOVERY.TIME}": event.updatedAt.toLocaleTimeString(),
+    "{EVENT.TIMESTAMP}": event.createdAt.toLocaleString(),
   };
 
   subject = Object.entries(replacement).reduce(
@@ -626,9 +625,7 @@ export async function sendNotification(
     console.log(
       `[${new Date().toLocaleString()}] Sending email by [${subject}]`
     );
-    recipients.forEach((recipient) => {
-      // sendEmail(recipient, subject, body);
-    });
+    // sendEmail(recipient, subject, body);
   } else if (type === "line") {
   }
 }
