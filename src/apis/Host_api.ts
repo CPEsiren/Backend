@@ -10,7 +10,7 @@ import { auth, authAdmin } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", authAdmin, getAllHosts);
+router.get("/", auth, getAllHosts);
 
 router.get("/:id", authAdmin, getHostById);
 
