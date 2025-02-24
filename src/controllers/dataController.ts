@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import Data from "../models/Data";
 import mongoose from "mongoose";
+import { isMoreThanSevenDays } from "../middleware/Time";
+import Trend from "../models/Trend";
 
 export const getAllData = async (req: Request, res: Response) => {
   try {
@@ -80,50 +82,101 @@ export const getHostBetween = async (req: Request, res: Response) => {
   }
 
   try {
-    const data = await Data.aggregate([
-      {
-        $match: {
-          "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
-          timestamp: {
-            $gte: new Date(startTime as string),
-            $lte: new Date(endTime as string),
-          },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            host_id: "$metadata.host_id",
-            item_id: "$metadata.item_id",
-            isBandwidth: "$metadata.isBandwidth",
-          },
-          data: {
-            $push: {
-              timestamp: "$timestamp",
-              value: "$value",
-            },
-          },
-          max_value: { $max: "$value" },
-          min_value: { $min: "$value" },
-          avg_value: { $avg: "$value" },
-        },
-      },
-      {
-        $group: {
-          _id: "$_id.host_id",
-          items: {
-            $push: {
-              item_id: "$_id.item_id",
-              isBandwidth: "$_id.isBandwidth",
-              max_value: "$max_value",
-              min_value: "$min_value",
-              avg_value: "$avg_value",
-              data: "$data",
+    const start = new Date(startTime as string);
+    const end = new Date(endTime as string);
+
+    let data;
+
+    if (isMoreThanSevenDays(start, end)) {
+      data = await Trend.aggregate([
+        {
+          $match: {
+            "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
+            timestamp: {
+              $gte: new Date(startTime as string),
+              $lte: new Date(endTime as string),
             },
           },
         },
-      },
-    ]);
+        {
+          $group: {
+            _id: {
+              host_id: "$metadata.host_id",
+              item_id: "$metadata.item_id",
+              isBandwidth: "$metadata.isBandwidth",
+            },
+            data: {
+              $push: {
+                timestamp: "$timestamp",
+              },
+            },
+            max_value: { $push: "$max_value" },
+            min_value: { $push: "$min_value" },
+            avg_value: { $push: "$avg_value" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.host_id",
+            items: {
+              $push: {
+                item_id: "$_id.item_id",
+                isBandwidth: "$_id.isBandwidth",
+                max_value: "$max_value",
+                min_value: "$min_value",
+                avg_value: "$avg_value",
+                data: "$data",
+              },
+            },
+          },
+        },
+      ]);
+    } else {
+      data = await Data.aggregate([
+        {
+          $match: {
+            "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
+            timestamp: {
+              $gte: new Date(startTime as string),
+              $lte: new Date(endTime as string),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              host_id: "$metadata.host_id",
+              item_id: "$metadata.item_id",
+              isBandwidth: "$metadata.isBandwidth",
+            },
+            data: {
+              $push: {
+                timestamp: "$timestamp",
+                value: "$value",
+              },
+            },
+            max_value: { $max: "$value" },
+            min_value: { $min: "$value" },
+            avg_value: { $avg: "$value" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.host_id",
+            items: {
+              $push: {
+                item_id: "$_id.item_id",
+                isBandwidth: "$_id.isBandwidth",
+                max_value: ["$max_value"],
+                min_value: ["$min_value"],
+                avg_value: ["$avg_value"],
+                data: "$data",
+              },
+            },
+          },
+        },
+      ]);
+    }
 
     await Data.populate(data, [
       {
