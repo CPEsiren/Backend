@@ -416,9 +416,9 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
               }
             );
             if (isExpressionValid) {
-              await handleHasTrigger(trigger, isTrigger.value);
+              await handleHasTrigger(trigger, isTrigger.value, null);
             } else {
-              await handleNotHasTrigger(trigger);
+              await handleNotHasTrigger(trigger, null);
             }
           });
         } else if (old_oper !== new_oper) {
@@ -443,9 +443,9 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
               }
             );
             if (isExpressionValid) {
-              await handleHasTrigger(trigger, isTrigger.value);
+              await handleHasTrigger(trigger, isTrigger.value, null);
             } else {
-              await handleNotHasTrigger(trigger);
+              await handleNotHasTrigger(trigger, null);
             }
           });
         }
@@ -515,9 +515,9 @@ export async function checkSnmpConnection(host_id: string) {
               }
             );
             if (isExpressionValid) {
-              await handleHasTrigger(trigger, isTrigger.value);
+              await handleHasTrigger(trigger, isTrigger.value, null);
             } else {
-              await handleNotHasTrigger(trigger);
+              await handleNotHasTrigger(trigger, null);
             }
           });
         }
@@ -553,9 +553,9 @@ export async function checkSnmpConnection(host_id: string) {
                 }
               );
               if (isExpressionValid) {
-                await handleHasTrigger(trigger, isTrigger.value);
+                await handleHasTrigger(trigger, isTrigger.value, null);
               } else {
-                await handleNotHasTrigger(trigger);
+                await handleNotHasTrigger(trigger, null);
               }
             });
           }
