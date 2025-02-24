@@ -11,6 +11,11 @@ interface IDashboard extends Document {
         itemId: mongoose.Types.ObjectId;
         hostId: mongoose.Types.ObjectId;
       };
+      todoItems?: {
+        id: number;
+        text: string;
+        completed: boolean;
+      }[];
     }
   ];
   isDefault: boolean;
@@ -46,6 +51,7 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
             "graph",
             "calendar",
             "eventblock",
+            "todolist",
           ],
         },
         graphSelection: {
@@ -58,6 +64,22 @@ const dashboardSchema: Schema<IDashboard> = new Schema(
             ref: "Host",
           },
         },
+        todoItems: [
+          {
+            id: {
+              type: Number,
+              required: true,
+            },
+            text: {
+              type: String,
+              required: true,
+            },
+            completed: {
+              type: Boolean,
+              default: false,
+            },
+          },
+        ],
       },
     ],
     isDefault: {
