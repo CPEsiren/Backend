@@ -1,7 +1,4 @@
-export async function createTime(): Promise<string> {
-  const date = new Date().toLocaleString("en-US", {
-    timeZone: "Asia/Bangkok",
-    hour12: false,
-  });
-  return date;
+import { differenceInDays } from "date-fns";
+export function isMoreThanSevenDays(startDate: Date, endDate: Date): boolean {
+  return differenceInDays(endDate, startDate) > 7;
 }
