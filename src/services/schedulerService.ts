@@ -108,11 +108,12 @@ async function summarizeDataToTrend() {
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
-            item_type: "$metadata.item_type",
+            isBandwidth: "$metadata.isBandwidth",
           },
-          averageValue: { $avg: "$Change_per_second" },
-          minValue: { $min: "$Change_per_second" },
-          maxValue: { $max: "$Change_per_second" },
+          minValue: { $min: "$value" },
+          maxValue: { $max: "$value" },
+          avg_value: { $avg: "$value" },
+          num_values: { $sum: 1 },
         },
       },
     ]);
@@ -122,13 +123,16 @@ async function summarizeDataToTrend() {
         metadata: {
           host_id: result._id.host_id,
           item_id: result._id.item_id,
-          item_type: result._id.item_type,
+          isBandwidth: result._id.isBandwidth,
         },
+        min_value: result.minValue,
+        max_value: result.maxValue,
+        avg_value: result.avg_value,
+        num_values: result.num_values,
         timestamp: now,
-        value_min: result.minValue,
-        value_max: result.maxValue,
-        value_avg: result.averageValue,
       });
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error("Error summarizing data to trend:", error);
+  }
 }
