@@ -11,9 +11,6 @@ import Host from "../models/Host";
 import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
 import Item, { IItem } from "../models/Item";
-import Action, { IAction } from "../models/Action";
-import { ok } from "assert";
-import { stat } from "fs";
 
 interface TriggerResult {
   triggered: boolean;
@@ -478,10 +475,10 @@ export async function handleHasTrigger(
           trigger.trigger_name
         }`
       );
-      await handleAction(updatedEvent, trigger, item);
+      await sendNotification(updatedEvent, trigger, item);
       schedules[updatedEvent._id as string] = setInterval(async () => {
         try {
-          await handleAction(updatedEvent, trigger, item);
+          await sendNotification(updatedEvent, trigger, item);
         } catch (error) {
           console.error(`Interval Action Error`, error);
         }
@@ -514,7 +511,7 @@ export async function handleNotHasTrigger(
 
     clearInterval(schedules[event?._id as string]);
     if (event) {
-      await handleAction(event, trigger, item);
+      await sendNotification(event, trigger, item);
       console.log(
         `[${new Date().toLocaleString()}] Event resolved of trigger ${
           trigger.trigger_name
@@ -541,54 +538,45 @@ export async function handleNotHasTrigger(
           trigger.trigger_name
         } by expression`
       );
-      await handleAction(event, trigger, item);
+      await sendNotification(event, trigger, item);
     }
   }
 }
 
-export async function handleAction(
-  event: IEvent,
-  trigger: ITrigger,
-  item: IItem | null
-) {
-  const actions = await Action.find({ enabled: true });
+// export async function handleAction(
+//   event: IEvent,
+//   trigger: ITrigger,
+//   item: IItem | null
+// ) {
+//   const actions = await Action.find({ enabled: true });
 
-  if (!actions) {
-    console.log(
-      `[${new Date().toLocaleString()}] No actions found or disabled`
-    );
-    return;
-  }
+//   if (!actions) {
+//     console.log(
+//       `[${new Date().toLocaleString()}] No actions found or disabled`
+//     );
+//     return;
+//   }
 
-  actions.forEach(async (action) => {
-    action.media_ids.forEach(async (media_id) => {
-      const media = await Media.findOne({ _id: media_id, enabled: true });
-      if (media) {
-        await sendNotification(media, action, event, trigger, item);
-      }
-    });
-  });
-}
+//   actions.forEach(async (action) => {
+//     action.media_ids.forEach(async (media_id) => {
+//       const media = await Media.findOne({ _id: media_id, enabled: true });
+//       if (media) {
+//         await sendNotification(media, action, event, trigger, item);
+//       }
+//     });
+//   });
+// }
 export async function sendNotification(
-  media: IMedia,
-  action: IAction,
   event: IEvent,
   trigger: ITrigger,
   item: IItem | null
 ) {
   const host = await Host.findOne({ _id: trigger.host_id });
-  const { type, recipient } = media;
-  const { status } = event;
-  let subject: string = "";
-  let body: string = "";
-  if (status === "RESOLVED") {
-    const { subjectRecoveryTemplate, messageRecoveryTemplate } = action;
-    subject = subjectRecoveryTemplate;
-    body = messageRecoveryTemplate;
-  } else {
-    const { subjectProblemTemplate, messageProblemTemplate } = action;
-    subject = subjectProblemTemplate;
-    body = messageProblemTemplate;
+  const medias = await Media.find({ enabled: true });
+
+  if (!medias) {
+    console.log(`[${new Date().toLocaleString()}] No medias found or disabled`);
+    return;
   }
 
   const replacement = {
@@ -597,7 +585,6 @@ export async function sendNotification(
     "{TRIGGER.EXPRESSION}": trigger.expression,
     "{TRIGGER.RECOVERY_EXPRESSION}": trigger.recovery_expression,
     "{TRIGGER.SEVERITY}": trigger.severity,
-    "{TRIGGER.STATUS}": status,
     //Host
     "{HOST.NAME}": host?.hostname ?? event.hostname,
     "{HOST.IP}": host?.ip_address ?? "Unknown IP",
@@ -606,26 +593,33 @@ export async function sendNotification(
     "{ITEM.VALUE}": event.value_alerted,
     //Event
     "{EVENT.STATUS}": event.status,
-    "{EVENT.HOSTNAME}": event.hostname,
-    "{EVENT.LASTVALUE}": event.value_alerted,
-    "{EVENT.TIMESTAMP}": event.createdAt.toLocaleString(),
+    "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString(),
+    "{EVENT.RECOVERY.TIMESTAMP}": event.updatedAt.toLocaleString(),
   };
 
-  subject = Object.entries(replacement).reduce(
-    (acc, [key, value]) => acc.replace(key, value as string),
-    subject
-  );
-
-  body = Object.entries(replacement).reduce(
-    (acc, [key, value]) => acc.replace(key, value as string),
-    body
-  );
-
-  if (type === "email") {
-    console.log(
-      `[${new Date().toLocaleString()}] Sending email by [${subject}]`
-    );
-    // sendEmail(recipient, subject, body);
-  } else if (type === "line") {
-  }
+  medias.forEach(async (media) => {
+    if (media.type === "email") {
+      console.log(
+        `[${new Date().toLocaleString()}] Sending email by [${
+          media.recipient.name
+        }]`
+      );
+      // await sendEmail(
+      //   media.recipient.send_to,
+      //   media.problem_title,
+      //   media.problem_body
+      // );
+    } else if (media.type === "line") {
+      console.log(
+        `[${new Date().toLocaleString()}] Sending line by [${
+          media.recipient.name
+        }]`
+      );
+      // await sendLine(
+      //   media.recipient.send_to,
+      //   media.problem_title,
+      //   media.problem_body
+      // );
+    }
+  });
 }
