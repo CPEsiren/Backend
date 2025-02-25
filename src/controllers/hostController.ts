@@ -212,6 +212,7 @@ export const createHost = async (req: Request, res: Response) => {
 
 export const deleteHost = async (req: Request, res: Response) => {
   const host_id = req.params.id;
+  const hostname = req.body.hostname;
 
   if (!mongoose.Types.ObjectId.isValid(host_id)) {
     return res.status(400).json({
@@ -254,7 +255,7 @@ export const deleteHost = async (req: Request, res: Response) => {
      await createActivityLog(
        username,
        role,
-       `Deleted host: ${host_id}`
+       `Deleted host: ${hostname}`
      );
 
     res.status(200).json({
@@ -270,6 +271,7 @@ export const deleteHost = async (req: Request, res: Response) => {
 export const updateHost = async (req: Request, res: Response) => {
   try {
     const host_id = req.params.id;
+    const hostname = req.body.oldHostname;
 
     if (!mongoose.Types.ObjectId.isValid(host_id)) {
       return res.status(400).json({
@@ -341,7 +343,7 @@ export const updateHost = async (req: Request, res: Response) => {
      await createActivityLog(
        username,
        role,
-       `Updated host: ${host_id}`
+       `Updated host: ${hostname}`
      );
 
     res.status(200).json({

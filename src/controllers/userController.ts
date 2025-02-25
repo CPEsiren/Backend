@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { User } from "../models/User";
 import mongoose from "mongoose";
+import { createActivityLog } from "./LogUserController";
 
 const getUser = async (req: Request, res: Response) => {
   try {
@@ -90,6 +91,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
+    const NOC = req.body.NOC;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -108,7 +110,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { role },
-      { new: true, runValidators: true, select: "username role" }
+      { new: true, runValidators: true, select: "username role" },
     ).lean();
 
     if (!updatedUser) {
@@ -117,6 +119,15 @@ export const updateUserRole = async (req: Request, res: Response) => {
         message: "User not found",
       });
     }
+
+     // Log for activity
+         const username = req.body.userName || "system";
+         const userdochangerole = req.body.userRole || "system";
+         await createActivityLog(
+           username,
+           userdochangerole,
+           `Updated role of: ${NOC}`
+         );
 
     res.status(200).json({
       status: "success",

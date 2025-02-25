@@ -49,14 +49,14 @@ export const createTemplate = async (req: Request, res: Response) => {
 
     await newTemplate.save();
 
-     // Log for activity
-        const username = req.body.userName || "system";
-        const role = req.body.userRole || "system";
-        await createActivityLog(
-          username,
-          role,
-          `Created template: ${template_name}`
-        );
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Created template: ${template_name}`
+    );
 
     res.status(201).json({
       status: "success",
@@ -72,6 +72,7 @@ export const createTemplate = async (req: Request, res: Response) => {
 export const updateTemplate = async (req: Request, res: Response) => {
   try {
     const template_id = req.params.id;
+    const template_name = req.body.template_name;
 
     if (!mongoose.Types.ObjectId.isValid(template_id)) {
       return res.status(400).json({
@@ -109,14 +110,14 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
-     // Log for activity
-     const username = req.body.userName || "system";
-     const role = req.body.userRole || "system";
-     await createActivityLog(
-       username,
-       role,
-       `Updated template: ${template_id}`
-     );
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Updated template: ${template_name}`
+    );
 
     res.status(200).json({
       status: "success",
@@ -132,6 +133,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
 export const deleteTemplate = async (req: Request, res: Response) => {
   try {
     const templateId = req.params.id;
+    const template_name = req.body.template_name;
 
     if (!mongoose.Types.ObjectId.isValid(templateId)) {
       return res.status(400).json({
@@ -149,14 +151,14 @@ export const deleteTemplate = async (req: Request, res: Response) => {
       });
     }
 
-     // Log for activity
-     const username = req.body.userName || "system";
-     const role = req.body.userRole || "system";
-     await createActivityLog(
-       username,
-       role,
-       `Deleted template: ${templateId}`
-     );
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Deleted template: ${template_name}`
+    );
 
     res.status(200).json({
       status: "success",
