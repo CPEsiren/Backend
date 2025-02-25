@@ -154,7 +154,7 @@ export const createHost = async (req: Request, res: Response) => {
 
       const itemDocuments = [
         {
-          item_name: "Total Inbound Traffic ",
+          item_name: "Total Inbound Traffic",
           oid: "1.3.6.1.2.1.2.2.1.10",
           type: "counter",
           unit: "bit",
@@ -163,7 +163,7 @@ export const createHost = async (req: Request, res: Response) => {
           host_id: newHost._id,
         },
         {
-          item_name: "Total Outbound Traffic ",
+          item_name: "Total Outbound Traffic",
           oid: "1.3.6.1.2.1.2.2.1.10",
           type: "counter",
           unit: "bit",
