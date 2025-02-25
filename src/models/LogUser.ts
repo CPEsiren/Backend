@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 // Interface for the Log document
-export interface ILog extends Document {
+export interface ILogUser extends Document {
   image: string;
   username: string;
   role: string;
@@ -10,7 +10,7 @@ export interface ILog extends Document {
 }
 
 // Schema for the Log model
-const LogSchema: Schema = new Schema(
+const LogUserSchema: Schema = new Schema(
   {
     username: { type: String, required: true },
     role: { type: String, required: true },
@@ -23,7 +23,7 @@ const LogSchema: Schema = new Schema(
 );
 
 // Explicitly set no index
-LogSchema.set("autoIndex", false);
+LogUserSchema.set("autoIndex", false);
 
 // Create and export the model
-export const Log = mongoose.model<ILog>("Log", LogSchema);
+export default mongoose.model<ILogUser>("LogUser", LogUserSchema);
