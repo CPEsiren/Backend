@@ -7,6 +7,7 @@ import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
 import Trigger from "../models/Trigger";
+import { createActivityLog } from "../controllers/LogUserController";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -181,6 +182,14 @@ export const createHost = async (req: Request, res: Response) => {
     }
 
     const createdHost = await Host.findById(newHost._id).lean();
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Created host: ${hostname}`
+    );
 
     res.status(201).json({
       status: "success",
@@ -239,6 +248,14 @@ export const deleteHost = async (req: Request, res: Response) => {
         "metadata.host_id": new mongoose.Types.ObjectId(host_id),
       }),
     ]);
+     // Log for activity
+     const username = req.body.userName || "system";
+     const role = req.body.userRole || "system";
+     await createActivityLog(
+       username,
+       role,
+       `Deleted host: ${host_id}`
+     );
 
     res.status(200).json({
       status: "success",
@@ -317,6 +334,15 @@ export const updateHost = async (req: Request, res: Response) => {
         message: `No host found with ID: ${host_id}`,
       });
     }
+
+     // Log for activity
+     const username = req.body.userName || "system";
+     const role = req.body.userRole || "system";
+     await createActivityLog(
+       username,
+       role,
+       `Updated host: ${host_id}`
+     );
 
     res.status(200).json({
       status: "success",

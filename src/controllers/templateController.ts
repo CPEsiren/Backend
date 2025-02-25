@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Template from "../models/Template";
 import mongoose from "mongoose";
+import { createActivityLog } from "./LogUserController";
 
 export const getAllTemplate = async (req: Request, res: Response) => {
   try {
@@ -47,6 +48,15 @@ export const createTemplate = async (req: Request, res: Response) => {
     });
 
     await newTemplate.save();
+
+     // Log for activity
+        const username = req.body.userName || "system";
+        const role = req.body.userRole || "system";
+        await createActivityLog(
+          username,
+          role,
+          `Created template: ${template_name}`
+        );
 
     res.status(201).json({
       status: "success",
@@ -99,6 +109,15 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
+     // Log for activity
+     const username = req.body.userName || "system";
+     const role = req.body.userRole || "system";
+     await createActivityLog(
+       username,
+       role,
+       `Updated template: ${template_id}`
+     );
+
     res.status(200).json({
       status: "success",
       message: `Template [${updatedTemplate.template_name}] updated successfully.`,
@@ -129,6 +148,15 @@ export const deleteTemplate = async (req: Request, res: Response) => {
         message: "Template not found.",
       });
     }
+
+     // Log for activity
+     const username = req.body.userName || "system";
+     const role = req.body.userRole || "system";
+     await createActivityLog(
+       username,
+       role,
+       `Deleted template: ${templateId}`
+     );
 
     res.status(200).json({
       status: "success",

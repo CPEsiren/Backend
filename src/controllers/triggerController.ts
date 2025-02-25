@@ -7,6 +7,7 @@ import {
   parseExpressionToItems,
 } from "../services/parserService";
 import Host from "../models/Host";
+import { createActivityLog } from "./LogUserController";
 
 const getTrigger = async (req: Request, res: Response) => {
   try {
@@ -221,6 +222,11 @@ const createTrigger = async (req: Request, res: Response) => {
     // Save the trigger
     await newTrigger.save();
 
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Created Trigger: ${trigger_name}`);
+
     res.status(201).json({
       message: `Trigger [${newTrigger.trigger_name}] created successfully`,
       trigger: newTrigger,
@@ -307,6 +313,11 @@ const updateTrigger = async (req: Request, res: Response) => {
       expressionRecoveryPart,
     });
 
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Updated Trigger: ${trigger_name}`);
+
     res.status(200).json({
       status: "success",
       message: `Trigger [${id}] updated successfully`,
@@ -338,6 +349,10 @@ const deleteTrigger = async (req: Request, res: Response) => {
       });
     }
 
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Deleted Trigger: ${id}`);
     res.status(200).json({
       status: "success",
       message: `Trigger [${deletedTrigger.trigger_name}] deleted successfully`,
