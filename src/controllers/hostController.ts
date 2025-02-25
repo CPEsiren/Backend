@@ -271,12 +271,20 @@ export const deleteHost = async (req: Request, res: Response) => {
 export const updateHost = async (req: Request, res: Response) => {
   try {
     const host_id = req.params.id;
-    const hostname = req.body.oldHostname;
 
     if (!mongoose.Types.ObjectId.isValid(host_id)) {
       return res.status(400).json({
         status: "fail",
         message: "Invalid host ID format.",
+      });
+    }
+
+    // Get the original host data for logging purposes
+    const originalHost: any = await Host.findById(host_id).lean();
+    if (!originalHost) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No host found with ID: ${host_id}`,
       });
     }
 
@@ -337,14 +345,20 @@ export const updateHost = async (req: Request, res: Response) => {
       });
     }
 
-     // Log for activity
-     const username = req.body.userName || "system";
-     const role = req.body.userRole || "system";
-     await createActivityLog(
-       username,
-       role,
-       `Updated host: ${hostname}`
-     );
+    // Generate the change summary for logging
+    const changes = Object.keys(updateData)
+      .filter(key => JSON.stringify(updateData[key]) !== JSON.stringify(originalHost[key as keyof typeof originalHost]))
+      .map(key => `${key}: ${JSON.stringify(originalHost[key as keyof typeof originalHost])} → ${JSON.stringify(updateData[key])}`)
+      .join(", ");
+
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole  || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Updated host: ${updatedHost.hostname} (${updatedHost.ip_address}). Changes: ${changes}`
+    );
 
     res.status(200).json({
       status: "success",
