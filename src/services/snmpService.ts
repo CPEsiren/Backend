@@ -1030,7 +1030,8 @@ export async function fetchInterfaceHost(
     }
     return interfaceItems;
   } catch (error) {
-    throw error;
+    console.error("Error fetching interface metrics:", error);
+    return [];
   } finally {
     session.close();
   }
