@@ -4,13 +4,7 @@ export interface ITrigger extends Document {
   trigger_name: string;
   type: "item" | "host";
   host_id: mongoose.Types.ObjectId;
-  severity:
-    | "not classified"
-    | "information"
-    | "warning"
-    | "average"
-    | "high"
-    | "disaster";
+  severity: "warning" | "critical" | "disaster";
   expression: string;
   logicExpression: string[];
   isExpressionValid: boolean;
@@ -58,14 +52,7 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
     },
     severity: {
       type: String,
-      enum: [
-        "not classified",
-        "information",
-        "warning",
-        "average",
-        "high",
-        "disaster",
-      ],
+      enum: ["warning", "critical", "disaster"],
       required: true,
     },
     expression: {
