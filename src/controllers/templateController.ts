@@ -26,7 +26,7 @@ export const getAllTemplate = async (req: Request, res: Response) => {
 
 export const createTemplate = async (req: Request, res: Response) => {
   try {
-    const { template_name, items, description } = req.body;
+    const { template_name, items, triggers, description } = req.body;
 
     const requiredFields = ["template_name"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
@@ -42,6 +42,7 @@ export const createTemplate = async (req: Request, res: Response) => {
     const newTemplate = new Template({
       template_name,
       items,
+      triggers,
       description,
     });
 
@@ -69,7 +70,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
-    const updateFields = ["template_name", "items", "description"];
+    const updateFields = ["template_name", "items", "description", "triggers"];
     const updateData: { [key: string]: any } = {};
 
     updateFields.forEach((field) => {
