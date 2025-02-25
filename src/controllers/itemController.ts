@@ -6,6 +6,7 @@ import Host from "../models/Host";
 import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
+import { createActivityLog } from "./LogUserController";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -82,6 +83,10 @@ export const createItem = async (req: Request, res: Response) => {
     }
 
     scheduleItem(newItem);
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Created item:${item_name}`);
 
     res.status(201).json({
       status: "success",
@@ -104,6 +109,7 @@ export const createItem = async (req: Request, res: Response) => {
 export const deleteItem = async (req: Request, res: Response) => {
   try {
     const item_id = req.params.id;
+    const item_name = req.params.itemToDelete_name;
 
     if (!mongoose.Types.ObjectId.isValid(item_id)) {
       return res.status(400).json({
@@ -141,6 +147,11 @@ export const deleteItem = async (req: Request, res: Response) => {
       const host = await Host.findById(deletedItem.host_id)
         .select("hostname")
         .lean();
+
+      // Log activity
+      const username = req.body.userName || "system";
+      const role = req.body.userRole || "system";
+      await createActivityLog(username, role, `Deleted item:${item_name}`);
 
       res.status(200).json({
         status: "success",
@@ -217,6 +228,11 @@ export const updateItem = async (req: Request, res: Response) => {
       .lean();
 
     await scheduleItem(updatedItem);
+
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Updated item:${item_id}`);
 
     res.status(200).json({
       status: "success",
