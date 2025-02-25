@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { User } from "../models/User";
 import Media from "../models/Media";
-import { createTime } from "../middleware/Time";
 import mongoose from "mongoose";
 
 const getMedia = async (req: Request, res: Response) => {
