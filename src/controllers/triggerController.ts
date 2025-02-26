@@ -332,6 +332,7 @@ const updateTrigger = async (req: Request, res: Response) => {
 const deleteTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const deletetriggername = req.body.trigger_name;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -352,7 +353,11 @@ const deleteTrigger = async (req: Request, res: Response) => {
     // Log activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Deleted Trigger: ${id}`);
+    await createActivityLog(
+      username,
+      role,
+      `Deleted Trigger: ${deletetriggername}`
+    );
     res.status(200).json({
       status: "success",
       message: `Trigger [${deletedTrigger.trigger_name}] deleted successfully`,
