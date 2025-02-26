@@ -7,7 +7,8 @@ const url = process.env.DATABASE_URL;
 
 export const connectDb = async (): Promise<void> => {
   if (!url) {
-    throw new Error("DATABASE_URL is not defined in the environment variables");
+    console.error(`DATABASE_URL is not defined`);
+    process.exit(1);
   }
 
   try {
@@ -16,6 +17,7 @@ export const connectDb = async (): Promise<void> => {
     });
     console.log("MongoDB connected successfully.");
   } catch (error) {
-    throw error;
+    console.error(`Error connecting to MongoDB: ${error}`);
+    process.exit(1);
   }
 };

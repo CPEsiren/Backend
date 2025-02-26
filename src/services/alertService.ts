@@ -427,7 +427,7 @@ export async function calculateLogic(input: string[]): Promise<boolean> {
         result = result || nextValue;
         break;
       default:
-        throw new Error(`Invalid operator: ${operator}`);
+        console.error(`Invalid operator: ${operator}`);
     }
 
     i += 2;

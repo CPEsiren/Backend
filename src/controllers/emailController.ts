@@ -91,7 +91,11 @@ export const sendOTP = async (req: Request, res: Response) => {
       htmlMessage
     );
     if (!isSuccess) {
-      throw new Error(`Failed to send ${email}.`);
+      console.error(`Failed to send email`);
+      return res.status(500).json({
+        status: "fail",
+        message: `Failed to send email`,
+      });
     }
 
     res.status(200).json({
