@@ -957,32 +957,32 @@ export async function fetchInterfaceHost(
   const columns = [1, 2, 3, 4, 5, 7, 8];
 
   const INTERFACE_METRICS = [
-    { suffix: "InOctets", oid: "10", type: "Counter", unit: "Octets" },
-    { suffix: "InUcastPkts", oid: "11", type: "Counter", unit: "Packets" },
+    { suffix: "InOctets", oid: "10", type: "counter", unit: "Octets" },
+    { suffix: "InUcastPkts", oid: "11", type: "counter", unit: "Packets" },
     {
       suffix: " InNUcastPkts",
       oid: "12",
-      type: "Counter",
+      type: "counter",
       unit: "Packets",
     },
-    { suffix: "InDiscards", oid: "13", type: "Counter", unit: "Packets" },
-    { suffix: "InErrors", oid: "14", type: "Counter", unit: "Packets" },
+    { suffix: "InDiscards", oid: "13", type: "counter", unit: "Packets" },
+    { suffix: "InErrors", oid: "14", type: "counter", unit: "Packets" },
     {
       suffix: "InUnknownProtos",
       oid: "15",
-      type: "Counter",
+      type: "counter",
       unit: "Packets",
     },
-    { suffix: "OutOctets", oid: "16", type: "Counter", unit: "Octets" },
-    { suffix: "OutUcastPkts", oid: "17", type: "Counter", unit: "Packets" },
+    { suffix: "OutOctets", oid: "16", type: "counter", unit: "Octets" },
+    { suffix: "OutUcastPkts", oid: "17", type: "counter", unit: "Packets" },
     {
       suffix: "OutNUcastPkts",
       oid: "18",
-      type: "Counter",
+      type: "counter",
       unit: "Packets",
     },
-    { suffix: "OutDiscards", oid: "19", type: "Counter", unit: "Packets" },
-    { suffix: "OutErrors", oid: "20", type: "Counter", unit: "Packets" },
+    { suffix: "OutDiscards", oid: "19", type: "counter", unit: "Packets" },
+    { suffix: "OutErrors", oid: "20", type: "counter", unit: "Packets" },
   ];
 
   try {
