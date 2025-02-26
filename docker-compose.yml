@@ -4,8 +4,6 @@ services:
     build: .
     ports:
       - 3009:3000
-    environment:
-      - MONGO_URI=mongodb://root:cp3$!r3n@mongodb:27017/CPE-Siren
     depends_on:
       - mongodb
 
