@@ -3,14 +3,14 @@ services:
   cpe-siren:
     build: .
     ports:
-      - 3000:3000
+      - 3009:3000
+    environment:
+      - MONGO_URI=mongodb://root:cp3$!r3n@mongodb:27017/CPE-Siren
     depends_on:
       - mongodb
 
   mongodb:
     image: mongo:latest
-    ports:
-      - 27017:27017
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=cp3$!r3n
