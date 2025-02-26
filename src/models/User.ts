@@ -1,12 +1,12 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-interface IUser extends Document {
+export interface IUser extends Document {
   username: string;
   email: string;
-  password?: string;
-  role: "admin" | "operator" | "viewer";
-  createdAt: Date;
-  isActive: boolean;
+  picture?: string;
+  role: "superdamin" | "admin" | "viewer";
+  token: string;
+  tokenExp: Date;
 }
 
 const UserSchema: Schema<IUser> = new Schema(
@@ -14,29 +14,31 @@ const UserSchema: Schema<IUser> = new Schema(
     username: {
       type: String,
       required: true,
-      unique: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
     },
-    password: {
+    picture: {
       type: String,
-      required: true,
     },
     role: {
       type: String,
-      enum: ["admin", "operator", "viewer"],
+      enum: ["superadmin", "admin", "viewer"],
       default: "viewer",
     },
-    isActive: {
-      type: Boolean,
-      default: true,
+    token: {
+      type: String,
+      required: true,
+    },
+    tokenExp: {
+      type: Date,
+      required: true,
     },
   },
   {
-    timestamps: { createdAt: "createdAt", updatedAt: false },
+    timestamps: { createdAt: true, updatedAt: true },
   }
 );
 

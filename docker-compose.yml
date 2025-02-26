@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  cpe-siren:
+    build: .
+    ports:
+      - 3000:3000
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=cp3$!r3n
+      - MONGO_INITDB_DATABASE=CPE-Siren
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
+
+volumes:
+  mongodb_data:

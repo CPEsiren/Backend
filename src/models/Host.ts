@@ -23,6 +23,16 @@ export interface IHost extends Document {
       interface_Operstatus: string;
     }
   ];
+  authenV3: IauthenV3;
+}
+
+export interface IauthenV3 {
+  username: string;
+  securityLevel: string;
+  authenProtocol: string;
+  authenPass: string;
+  privacyProtocol: string;
+  privacyPass: string;
 }
 
 const hostSchema: Schema<IHost> = new mongoose.Schema(
@@ -30,7 +40,11 @@ const hostSchema: Schema<IHost> = new mongoose.Schema(
     hostname: { type: String, required: true },
     ip_address: { type: String, required: true },
     snmp_port: { type: String, required: true },
-    snmp_version: { type: String, default: "v2c" },
+    snmp_version: {
+      type: String,
+      enum: ["SNMPv1", "SNMPv2", "SNMPv3"],
+      default: "SNMPv2",
+    },
     snmp_community: { type: String, required: true },
     hostgroup: { type: String, required: true },
     template_name: { type: String },
@@ -47,6 +61,17 @@ const hostSchema: Schema<IHost> = new mongoose.Schema(
         interface_Operstatus: { type: String, required: true },
       },
     ],
+    authenV3: {
+      username: { type: String },
+      securityLevel: {
+        type: String,
+        enum: ["noAuthNoPriv", "authNoPriv", "authPriv", ""],
+      },
+      authenProtocol: { type: String, enum: ["MD5", "SHA", ""] },
+      authenPass: { type: String },
+      privacyProtocol: { type: String, enum: ["NONE", "DES", "AES", ""] },
+      privacyPass: { type: String },
+    },
   },
   {
     timestamps: { createdAt: "createAt", updatedAt: "updateAt" },

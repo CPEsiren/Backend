@@ -1,132 +1,172 @@
-import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import Template from "../models/Template";
 import mongoose from "mongoose";
+import { createActivityLog } from "./LogUserController";
 
 export const getAllTemplate = async (req: Request, res: Response) => {
   try {
-    const template = await Template.find().lean().exec();
+    const templates = await Template.find().select("-__v").lean().exec();
 
-    if (!template.length) {
-      await addLog("WARNING", "No template found.", false);
+    if (templates.length === 0) {
       return res.status(404).json({
         status: "fail",
-        message: "No template found.",
+        message: "No templates found.",
       });
     }
 
-    await addLog("INFO", "Template fetched successfully.", false);
     res.status(200).json({
       status: "success",
       message: "Template fetched successfully.",
-      data: template,
+      data: templates,
     });
   } catch (err) {
-    await addLog("ERROR", "Error fetching template.", false);
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching template.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+    console.error("Error fetching templates:", err);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const createTemplate = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const { template_name, items, description } = req.body;
+    const { template_name, items, triggers, description } = req.body;
 
-    if (!template_name || !description) {
-      await addLog("WARNING", "Missing required fields.", false);
+    const requiredFields = ["template_name"];
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         status: "fail",
         message: "Missing required fields.",
-        requiredFields: ["name_template", "description"],
+        requiredFields: missingFields,
       });
     }
 
     const newTemplate = new Template({
       template_name,
       items,
+      triggers,
       description,
     });
 
-    await newTemplate.save({ session });
+    await newTemplate.save();
 
-    await session.commitTransaction();
-    session.endSession();
-
-    await addLog(
-      "INFO",
-      `Template [${newTemplate.template_name}] created successfully.`,
-      true
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Created template: ${template_name}`
     );
+
     res.status(201).json({
       status: "success",
       message: `Template [${newTemplate.template_name}] created successfully.`,
       data: newTemplate,
     });
   } catch (error) {
-    await session.abortTransaction();
-    await addLog("ERROR", "Error creating template.", false);
-    res.status(500).json({
-      status: "error",
-      message: "Error creating template.",
-      error: error instanceof Error ? error.message : "Unknown error",
+    console.error("Error creating template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
+  }
+};
+
+export const updateTemplate = async (req: Request, res: Response) => {
+  try {
+    const template_id = req.params.id;
+    const template_name = req.body.template_name;
+
+    if (!mongoose.Types.ObjectId.isValid(template_id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid template ID format.",
+      });
+    }
+
+    const updateFields = ["template_name", "items", "description", "triggers"];
+    const updateData: { [key: string]: any } = {};
+
+    updateFields.forEach((field) => {
+      if (field in req.body) {
+        updateData[field] = req.body[field];
+      }
     });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "No valid update fields provided.",
+      });
+    }
+
+    const updatedTemplate = await Template.findByIdAndUpdate(
+      template_id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedTemplate) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No template found with ID: ${template_id}`,
+      });
+    }
+
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Updated template: ${template_name}`
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: `Template [${updatedTemplate.template_name}] updated successfully.`,
+      data: { template: updatedTemplate },
+    });
+  } catch (error) {
+    console.error("Error updating template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 export const deleteTemplate = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const templateId = req.params.id;
+    const template_name = req.body.template_name;
 
-    if (!templateId || !mongoose.Types.ObjectId.isValid(templateId)) {
-      await addLog("WARNING", "Invalid template ID.", false);
+    if (!mongoose.Types.ObjectId.isValid(templateId)) {
       return res.status(400).json({
         status: "fail",
-        message: "Valid template ID is required.",
+        message: "Invalid template ID format.",
       });
     }
 
-    const deletedTemplate = await Template.findByIdAndDelete(
-      templateId
-    ).session(session);
+    const deletedTemplate = await Template.findByIdAndDelete(templateId).lean();
 
     if (!deletedTemplate) {
-      await session.abortTransaction();
-      await addLog("WARNING", "Template not found.", false);
       return res.status(404).json({
         status: "fail",
         message: "Template not found.",
       });
     }
 
-    await session.commitTransaction();
-    session.endSession();
-
-    await addLog(
-      "INFO",
-      `Template [${deletedTemplate.template_name}] deleted successfully.`,
-      true
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Deleted template: ${template_name}`
     );
+
     res.status(200).json({
       status: "success",
       message: "Template deleted successfully.",
-      data: deletedTemplate,
+      data: { template: deletedTemplate },
     });
   } catch (error) {
-    await session.abortTransaction();
-    await addLog("ERROR", "Error deleting template.", false);
-    res.status(500).json({
-      status: "error",
-      message: "Error deleting template.",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("Error deleting template: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };

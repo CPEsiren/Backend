@@ -1,16 +1,17 @@
-// import { fetchAndStoreSnmpData } from "../services/snmpService";
-import { body, validationResult } from "express-validator";
-import { Router, Request, Response } from "express";
-import { Db, MongoClient, ObjectId } from "mongodb";
-import dotenv from "dotenv";
-import { getAllData, getData } from "../controllers/dataController";
+import { Router } from "express";
+import {
+  getAllData,
+  getHostBetween,
+  getItemBetween,
+} from "../controllers/dataController";
+import { auth } from "../middleware/auth";
 
 const router = Router();
 
-dotenv.config();
+router.get("/", auth, getAllData);
 
-router.get("/", getAllData);
+router.get("/between", auth, getHostBetween);
 
-router.get("/:id", getData);
+router.get("/item/between", auth, getItemBetween);
 
 export default router;

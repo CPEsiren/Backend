@@ -1,42 +1,81 @@
-import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import Trigger from "../models/Trigger";
+import Item from "../models/Item";
+import mongoose from "mongoose";
+import {
+  parseExpressionDetailed,
+  parseExpressionToItems,
+} from "../services/parserService";
+import Host from "../models/Host";
+import { createActivityLog } from "./LogUserController";
 
 const getTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const trigger = await Trigger.findById(id);
-    if (!trigger) {
-      await addLog("WARNING", "Trigger not found", false);
-      return res.status(404).json({ message: "Trigger not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid trigger ID format.",
+      });
     }
 
-    await addLog("INFO", "Trigger retrieved successfully", false);
-    res.status(200).json(trigger);
+    const trigger = await Trigger.findById(id).select("-__v").lean().exec();
+    if (!trigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Trigger not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: trigger,
+    });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving trigger: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching trigger: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const getTriggers = async (req: Request, res: Response) => {
   try {
-    const { severity, enabled } = req.query;
+    const data = await Trigger.aggregate([
+      {
+        $group: {
+          _id: "$host_id",
+          triggers: { $push: "$$ROOT" },
+        },
+      },
+      {
+        $project: {
+          host_id: "$_id",
+          triggers: 1,
+          _id: 0,
+        },
+      },
+    ]);
 
-    const query: any = {};
-    if (severity) query.severity = severity;
-    if (enabled !== undefined) query.enabled = enabled === "true";
+    await Host.populate(data, {
+      path: "host_id",
+      model: "Host",
+      select: "hostname -_id",
+    });
 
-    const triggers = await Trigger.find(query);
+    if (data.length === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No triggers found",
+      });
+    }
 
-    await addLog("INFO", "Triggers retrieved successfully", false);
     res.status(200).json({
-      triggers,
+      status: "success",
+      data,
     });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving triggers: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching triggers: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -45,64 +84,162 @@ const createTrigger = async (req: Request, res: Response) => {
     const {
       trigger_name,
       host_id,
-      item_id,
-      ComparisonOperator,
-      valuetrigger,
       severity,
+      expression,
+      ok_event_generation,
+      recovery_expression,
+      enabled,
+      expressionPart,
+      expressionRecoveryPart,
     } = req.body;
 
+    const requiredFields = [
+      "trigger_name",
+      "host_id",
+      "severity",
+      "expression",
+      "ok_event_generation",
+      "enabled",
+      "expressionPart",
+      "expressionRecoveryPart",
+    ];
+
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
     // Validate input
-    if (
-      !trigger_name ||
-      !host_id ||
-      !item_id ||
-      !ComparisonOperator ||
-      valuetrigger === undefined ||
-      !severity
-    ) {
-      await addLog("WARNING", "Missing required fields", false);
-      return res.status(400).json({ message: "Missing required fields" });
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: missingFields,
+      });
     }
 
-    // Check if a trigger with the same name already exists
-    const existingTrigger = await Trigger.findOne({ trigger_name, severity });
-    if (existingTrigger) {
-      await addLog(
-        "WARNING",
-        "Trigger with this name and severity already exists",
-        false
-      );
-      return res.status(409).json({
-        message: "Trigger with this name and severity already exists",
+    if (expressionPart.duration) {
+      const expressionDuration = expressionPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
+    if (expressionRecoveryPart.duration) {
+      const expressionDuration = expressionRecoveryPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const addedItemNames = new Set<string>();
+
+    //parse expression
+    const parsedItemsExp = new Set(parseExpressionToItems(expression));
+
+    const logicExpression = parseExpressionDetailed(expression).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
+      }
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+
+    if (recovery_expression) {
+      const parsedRecoveryItems = parseExpressionToItems(recovery_expression);
+      parsedRecoveryItems.forEach((item) => parsedItemsExp.add(item));
+    }
+
+    if (parsedItemsExp.size === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid expression format",
       });
+    }
+
+    const logicRecoveryExpression = parseExpressionDetailed(
+      recovery_expression
+    ).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
+      }
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+
+    let type = "item";
+
+    for (const itemName of parsedItemsExp) {
+      if (!addedItemNames.has(itemName)) {
+        const item = await Item.findOne({ item_name: itemName });
+        if (item) {
+          items.push([itemName, item._id]);
+          addedItemNames.add(itemName);
+        } else {
+          if (
+            !(
+              itemName.includes("Device Status") ||
+              itemName.includes("Interface Operation Status") ||
+              itemName.includes("Interface Admin Status")
+            )
+          ) {
+            return res.status(400).json({
+              status: "fail",
+              message: `Item [${itemName}] not found`,
+            });
+          } else {
+            type = "host";
+          }
+        }
+      }
     }
 
     // Create new trigger
     const newTrigger = new Trigger({
       trigger_name,
+      type,
       host_id,
-      item_id,
-      ComparisonOperator,
-      valuetrigger,
       severity,
-      enabled: true, // Default to enabled
+      expression,
+      logicExpression,
+      items,
+      ok_event_generation,
+      recovery_expression,
+      logicRecoveryExpression,
+      enabled,
+      expressionPart,
+      expressionRecoveryPart,
     });
 
     // Save the trigger
     await newTrigger.save();
 
-    await addLog(
-      "INFO",
-      `Trigger [${newTrigger.trigger_name}] created successfully`,
-      true
-    );
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Created Trigger: ${trigger_name}`);
+
     res.status(201).json({
       message: `Trigger [${newTrigger.trigger_name}] created successfully`,
       trigger: newTrigger,
     });
   } catch (error) {
-    await addLog("ERROR", `Error creating trigger: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    await Trigger.findOneAndDelete({
+      trigger_name: req.body.trigger_name,
+      type: req.body.type,
+      host_id: req.body.host_id,
+      severity: req.body.severity,
+    });
+    console.error("Error creating trigger:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -110,90 +247,125 @@ const updateTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
-      name,
-      host_id,
-      item_id,
-      ComparisonOperator,
-      valuetrigger,
+      trigger_name,
       severity,
+      expression,
+      recovery_expression,
+      ok_event_generation,
       enabled,
+      expressionPart,
+      expressionRecoveryPart,
     } = req.body;
 
-    // Find the trigger
-    const trigger = await Trigger.findById(id);
-    if (!trigger) {
-      await addLog("WARNING", "Trigger not found", false);
-      return res.status(404).json({ message: "Trigger not found" });
-    }
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const addedItemNames = new Set<string>();
 
-    // Update fields if they are provided
-    if (name !== undefined) {
-      // Check if the new name already exists (excluding the current trigger)
-      const existingTrigger = await Trigger.findOne({ name, _id: { $ne: id } });
-      if (existingTrigger) {
-        await addLog("WARNING", "Trigger with this name already exists", false);
-        return res
-          .status(409)
-          .json({ message: "Trigger with this name already exists" });
+    //parse expression
+    const parsedItemsExp = new Set(parseExpressionToItems(expression));
+    const logicExpression = parseExpressionDetailed(expression).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
       }
-      trigger.trigger_name = name;
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+    if (recovery_expression) {
+      const parsedRecoveryItems = parseExpressionToItems(recovery_expression);
+      parsedRecoveryItems.forEach((item) => parsedItemsExp.add(item));
     }
-    if (host_id !== undefined) trigger.host_id = host_id;
-    if (item_id !== undefined) trigger.item_id = item_id;
-    if (ComparisonOperator !== undefined)
-      trigger.ComparisonOperator = ComparisonOperator;
-    if (valuetrigger !== undefined) trigger.valuetrigger = valuetrigger;
-    if (severity !== undefined) trigger.severity = severity;
-    if (enabled !== undefined) trigger.enabled = enabled;
 
-    // Validate ComparisonOperator if it's being updated
-    if (ComparisonOperator !== undefined) {
-      const validOperators = ["<", "<=", "=", ">=", ">", "!="];
-      if (!validOperators.includes(ComparisonOperator)) {
-        await addLog("WARNING", "Invalid ComparisonOperator", false);
-        return res.status(400).json({ message: "Invalid ComparisonOperator" });
+    if (parsedItemsExp.size === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid expression format",
+      });
+    }
+
+    const logicRecoveryExpression = parseExpressionDetailed(
+      recovery_expression
+    ).map((item) => {
+      if (Array.isArray(item) && item.length === 3) {
+        return "false"; // แทนที่เงื่อนไขด้วย 'false'
+      }
+      return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+    });
+
+    for (const itemName of parsedItemsExp) {
+      if (!addedItemNames.has(itemName)) {
+        const item = await Item.findOne({ item_name: itemName });
+        if (item) {
+          items.push([itemName, item._id]);
+          addedItemNames.add(itemName);
+        }
       }
     }
 
-    // Save the updated trigger
-    await trigger.save();
+    const trigger = await Trigger.findByIdAndUpdate(id, {
+      trigger_name,
+      severity,
+      expression,
+      logicExpression,
+      items,
+      ok_event_generation,
+      recovery_expression,
+      logicRecoveryExpression,
+      enabled,
+      expressionPart,
+      expressionRecoveryPart,
+    });
 
-    await addLog(
-      "INFO",
-      `Trigger [${trigger.trigger_name}] updated successfully`,
-      true
-    );
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Updated Trigger: ${trigger_name}`);
+
     res.status(200).json({
-      message: `Trigger [${trigger.trigger_name}] updated successfully`,
+      status: "success",
+      message: `Trigger [${id}] updated successfully`,
       trigger,
     });
   } catch (error) {
-    await addLog("ERROR", `Error updating trigger: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error updating trigger: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const deleteTrigger = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const deletetriggername = req.body.trigger_name;
 
-    // Find the trigger and delete it
-    const trigger = await Trigger.findByIdAndDelete(id);
-
-    if (!trigger) {
-      await addLog("WARNING", "Trigger not found", false);
-      return res.status(404).json({ message: "Trigger not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid trigger ID format.",
+      });
     }
 
-    await addLog(
-      "INFO",
-      `Trigger [${trigger.trigger_name}] deleted successfully`,
-      true
+    const deletedTrigger = await Trigger.findByIdAndDelete(id).lean();
+
+    if (!deletedTrigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Trigger not found",
+      });
+    }
+
+    // Log activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      role,
+      `Deleted Trigger: ${deletetriggername}`
     );
-    res.status(200).json({ message: "Trigger deleted successfully" });
+    res.status(200).json({
+      status: "success",
+      message: `Trigger [${deletedTrigger.trigger_name}] deleted successfully`,
+      data: { trigger: deletedTrigger },
+    });
   } catch (error) {
-    await addLog("ERROR", `Error deleting trigger: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error deleting trigger:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 

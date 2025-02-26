@@ -7,16 +7,18 @@ import {
   updateItem,
 } from "../controllers/itemController";
 
+import { authAdmin } from "../middleware/auth";
+
 const router = Router();
 
-router.get("/", getAllItem);
+router.get("/", authAdmin, getAllItem);
 
-router.post("/", createItem);
+router.post("/", authAdmin, createItem);
 
-router.get("/interface/", scanInterface);
+router.post("/interface/", authAdmin, scanInterface);
 
-router.put("/edit/:id", updateItem);
+router.put("/edit/:id", authAdmin, updateItem);
 
-router.delete("/:id", deleteItem);
+router.delete("/:id", authAdmin, deleteItem);
 
 export default router;

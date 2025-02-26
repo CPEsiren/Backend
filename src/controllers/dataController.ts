@@ -1,7 +1,8 @@
-import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import Data from "../models/Data";
 import mongoose from "mongoose";
+import { isMoreThanSevenDays } from "../middleware/Time";
+import Trend from "../models/Trend";
 
 export const getAllData = async (req: Request, res: Response) => {
   try {
@@ -11,14 +12,12 @@ export const getAllData = async (req: Request, res: Response) => {
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
-            item_type: "$metadata.item_type",
+            isBandwidth: "$metadata.isBandwidth",
           },
           data: {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
-              Simple_change: "$Simple_change",
-              Change_per_second: "$Change_per_second",
             },
           },
         },
@@ -29,7 +28,7 @@ export const getAllData = async (req: Request, res: Response) => {
           items: {
             $push: {
               item_id: "$_id.item_id",
-              item_type: "$_id.item_type",
+              isBandwidth: "$_id.isBandwidth",
               data: "$data",
             },
           },
@@ -37,63 +36,220 @@ export const getAllData = async (req: Request, res: Response) => {
       },
     ]);
 
-    await Data.populate(data, {
-      path: "items.item_id",
-      model: "Item",
-      select: "_id item_name oid type unit",
-    });
-
-    await Data.populate(data, {
-      path: "_id",
-      model: "Host",
-      select: "hostname",
-    });
-
     if (!data.length) {
-      await addLog("WARNING", "No data found.", false);
       return res.status(404).json({
         status: "fail",
         message: "No data found.",
       });
     }
 
-    await addLog("INFO", "Data fetched successfully.", false);
+    await Data.populate(data, [
+      {
+        path: "items.item_id",
+        model: "Item",
+        select: "_id item_name oid type unit",
+      },
+      {
+        path: "_id",
+        model: "Host",
+        select: "hostname",
+      },
+    ]);
+
     res.status(200).json({
       status: "success",
       message: "Data fetched successfully.",
       data: data,
     });
-  } catch (err) {
-    await addLog("ERROR", `Error fetching data: ${err}`, false);
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching data.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+  } catch (error) {
+    console.error("Error fetching data:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-export const getData = async (req: Request, res: Response) => {
-  const host_id = req.params.id;
+export const getHostBetween = async (req: Request, res: Response) => {
+  const { startTime, endTime, host_id } = req.query;
+
+  const requiredFields = ["startTime", "endTime", "host_id"];
+  const missingFields = requiredFields.filter((field) => !req.query[field]);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      status: "fail",
+      message: "Missing required fields.",
+      requiredFields: missingFields,
+    });
+  }
+
+  try {
+    const start = new Date(startTime as string);
+    const end = new Date(endTime as string);
+
+    let data;
+
+    if (isMoreThanSevenDays(start, end)) {
+      data = await Trend.aggregate([
+        {
+          $match: {
+            "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
+            timestamp: {
+              $gte: new Date(startTime as string),
+              $lte: new Date(endTime as string),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              host_id: "$metadata.host_id",
+              item_id: "$metadata.item_id",
+              isBandwidth: "$metadata.isBandwidth",
+            },
+            data: {
+              $push: {
+                timestamp: "$timestamp",
+              },
+            },
+            max_value: { $push: "$max_value" },
+            min_value: { $push: "$min_value" },
+            avg_value: { $push: "$avg_value" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.host_id",
+            items: {
+              $push: {
+                item_id: "$_id.item_id",
+                isBandwidth: "$_id.isBandwidth",
+                max_value: "$max_value",
+                min_value: "$min_value",
+                avg_value: "$avg_value",
+                data: "$data",
+              },
+            },
+          },
+        },
+      ]);
+    } else {
+      data = await Data.aggregate([
+        {
+          $match: {
+            "metadata.host_id": new mongoose.Types.ObjectId(host_id as string),
+            timestamp: {
+              $gte: new Date(startTime as string),
+              $lte: new Date(endTime as string),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              host_id: "$metadata.host_id",
+              item_id: "$metadata.item_id",
+              isBandwidth: "$metadata.isBandwidth",
+            },
+            data: {
+              $push: {
+                timestamp: "$timestamp",
+                value: "$value",
+              },
+            },
+            max_value: { $max: "$value" },
+            min_value: { $min: "$value" },
+            avg_value: { $avg: "$value" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.host_id",
+            items: {
+              $push: {
+                item_id: "$_id.item_id",
+                isBandwidth: "$_id.isBandwidth",
+                max_value: ["$max_value"],
+                min_value: ["$min_value"],
+                avg_value: ["$avg_value"],
+                data: "$data",
+              },
+            },
+          },
+        },
+      ]);
+    }
+
+    await Data.populate(data, [
+      {
+        path: "items.item_id",
+        model: "Item",
+        select: "_id item_name oid type unit",
+      },
+      {
+        path: "_id",
+        model: "Host",
+        select: "hostname",
+      },
+    ]);
+
+    if (!data.length) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No data found between the specified times.",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Data fetched successfully for the specified time range.",
+      data: data,
+    });
+  } catch (error) {
+    console.error("Error fetching data between times:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
+  }
+};
+
+export const getItemBetween = async (req: Request, res: Response) => {
+  const { startTime, endTime, item_id } = req.query;
+
+  const requiredFields = ["startTime", "endTime", "item_id"];
+  const missingFields = requiredFields.filter((field) => !req.query[field]);
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      status: "fail",
+      message: "Missing required fields.",
+      requiredFields: missingFields,
+    });
+  }
+
   try {
     const data = await Data.aggregate([
       {
-        $match: { "metadata.host_id": new mongoose.Types.ObjectId(host_id) },
+        $match: {
+          "metadata.item_id": new mongoose.Types.ObjectId(item_id as string),
+          timestamp: {
+            $gte: new Date(startTime as string),
+            $lte: new Date(endTime as string),
+          },
+        },
       },
       {
         $group: {
           _id: {
             host_id: "$metadata.host_id",
             item_id: "$metadata.item_id",
+            isBandwidth: "$metadata.isBandwidth",
           },
           data: {
             $push: {
               timestamp: "$timestamp",
               value: "$value",
-              Simple_change: "$Simple_change",
-              Change_per_second: "$Change_per_second",
             },
           },
+          max_value: { $max: "$value" },
+          min_value: { $min: "$value" },
+          avg_value: { $avg: "$value" },
         },
       },
       {
@@ -102,6 +258,10 @@ export const getData = async (req: Request, res: Response) => {
           items: {
             $push: {
               item_id: "$_id.item_id",
+              isBandwidth: "$_id.isBandwidth",
+              max_value: "$max_value",
+              min_value: "$min_value",
+              avg_value: "$avg_value",
               data: "$data",
             },
           },
@@ -109,38 +269,33 @@ export const getData = async (req: Request, res: Response) => {
       },
     ]);
 
-    await Data.populate(data, {
-      path: "items.item_id",
-      model: "Item",
-      select: "_id name_item oid type unit",
-    });
-
-    await Data.populate(data, {
-      path: "_id",
-      model: "Host",
-      select: "hostname",
-    });
+    await Data.populate(data, [
+      {
+        path: "items.item_id",
+        model: "Item",
+        select: "_id item_name oid type unit",
+      },
+      {
+        path: "_id",
+        model: "Host",
+        select: "hostname",
+      },
+    ]);
 
     if (!data.length) {
-      await addLog("WARNING", "No data found.", false);
       return res.status(404).json({
         status: "fail",
-        message: "No data found.",
+        message: "No data found between the specified times.",
       });
     }
 
-    await addLog("INFO", "Data fetched successfully.", false);
     res.status(200).json({
       status: "success",
-      message: "Data fetched successfully.",
+      message: "Data fetched successfully for the specified time range.",
       data: data,
     });
-  } catch (err) {
-    await addLog("ERROR", `Error fetching data: ${err}`, false);
-    res.status(500).json({
-      status: "error",
-      message: "Error fetching data.",
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
+  } catch (error) {
+    console.error("Error fetching data between times:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };

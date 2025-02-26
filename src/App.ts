@@ -1,6 +1,5 @@
 // src/app.ts
 import express, { Express, Request, Response, NextFunction } from "express";
-import { addLog, createFileLog } from "./services/logService";
 import { setupSchedules } from "./services/schedulerService";
 import { connectDb } from "./services/database";
 import bodyParser from "body-parser";
@@ -11,7 +10,6 @@ import cors from "cors";
 const app: Express = express();
 
 async function start() {
-  await createFileLog();
   try {
     dotenv.config();
 
@@ -19,8 +17,8 @@ async function start() {
 
     app.use(cors());
     app.use(bodyParser.json());
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      console.log(`${req.method} ${req.url}`);
+    app.use(async (req: Request, res: Response, next: NextFunction) => {
+      console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.url}`);
       // Log requests to the file with Thai timezone
       next();
     });
@@ -29,11 +27,6 @@ async function start() {
 
     await setupSchedules();
   } catch (err) {
-    await addLog(
-      "ERROR",
-      err instanceof Error ? err.message : "Unknown error",
-      false
-    );
     console.error("Failed to start the application:", err);
 
     process.exit(1);

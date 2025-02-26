@@ -2,17 +2,22 @@ import express from "express";
 import {
   getUser,
   getUsers,
-  createUser,
-  updateUser,
   deleteUser,
+  getRole,
+  updateUserRole,
 } from "../controllers/userController";
+import { auth, authAdmin } from "../middleware/auth";
 
 const router = express.Router();
 
-router.get("/", getUsers);
-router.get("/:id", getUser);
-router.post("/", createUser);
-router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
+router.get("/", auth, getUsers);
+
+router.get("/:id", auth, getUser);
+
+router.get("/role/:id", auth, getRole);
+
+router.put("/editrole/:id", auth, updateUserRole);
+
+router.delete("/:id", authAdmin, deleteUser);
 
 export default router;

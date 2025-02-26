@@ -1,119 +1,188 @@
-import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import { User } from "../models/User";
 import Media from "../models/Media";
+import mongoose from "mongoose";
 
 const getMedia = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const media = await Media.find().select("-__v").lean().exec();
 
-    const media = await Media.findById(id).populate("userId");
-    if (!media) {
-      await addLog("WARNING", `No media found with ID: ${id}`, false);
-      return res.status(404).json({ message: "Media not found" });
+    if (media.length === 0) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "No media found." });
     }
 
-    const user = await User.findById(media.user_id);
-
-    await addLog(
-      "INFO",
-      `Media with [${media.type}] of user [${user?.username}] retrieved successfully`,
-      false
-    );
-    res.status(200).json(media);
+    res.status(200).json({
+      status: "success",
+      data: media,
+    });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving media: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching media: ", error);
+    res
+      .status(500)
+      .json({ status: "fail", message: `Internal server error : ${error}` });
   }
 };
 
-const getMediaList = async (req: Request, res: Response) => {
+const getMediaUser = async (req: Request, res: Response) => {
   try {
-    const { type, user_id } = req.query;
+    const { user_id } = req.params;
 
-    const query: any = {};
-    if (type) query.type = type;
-    if (user_id) query.user_id = user_id;
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
+    }
 
-    const mediaList = await Media.find(query);
+    const media = await Media.find({ user_id })
+      .select("-__v -recipient.send_to")
+      .lean()
+      .exec();
 
-    const total = await Media.countDocuments(query);
+    if (media.length === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No media found for this user.",
+      });
+    }
 
-    await addLog("INFO", "Media list retrieved successfully", false);
     res.status(200).json({
-      mediaList,
-      total,
+      status: "success",
+      data: media,
     });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving media list: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error fetching user media: ", error);
+    res
+      .status(500)
+      .json({ status: "fail", message: `Internal server error : ${error}` });
   }
 };
 
 const createMedia = async (req: Request, res: Response) => {
   try {
-    const { type, details, user_id } = req.body;
+    const {
+      user_id,
+      type,
+      recipient,
+      problem_title,
+      problem_body,
+      recovery_title,
+      recovery_body,
+    } = req.body;
 
-    if (!type || !details || !user_id) {
-      await addLog("WARNING", "Missing required fields", false);
-      return res.status(400).json({ message: "Missing required fields" });
+    const requiredFields = [
+      "user_id",
+      "type",
+      "recipient",
+      "problem_title",
+      "problem_body",
+      "recovery_title",
+      "recovery_body",
+    ];
+
+    const missingFields = requiredFields.filter((field) => !req.body[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Missing required fields.",
+        requiredFields: missingFields,
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
+    }
+
+    const user = await User.findById(user_id);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "User not found" });
     }
 
     const newMedia = new Media({
-      type,
-      details,
       user_id,
+      type,
+      recipient,
+      problem_title,
+      problem_body,
+      recovery_title,
+      recovery_body,
     });
 
     await newMedia.save();
 
-    const user = await User.findById(user_id);
-
-    await addLog(
-      "INFO",
-      `Media [${type}] of user [${user?.username}] created successfully`,
-      true
-    );
     res.status(201).json({
-      message: `Media [${type}] of user [${user?.username}] created successfully`,
-      media: newMedia,
+      status: "success",
+      message: `Media [${type}] of user [${user_id}] created successfully`,
+      data: newMedia,
     });
   } catch (error) {
-    await addLog("ERROR", `Error creating media: ${error}`, false);
-    res.status(500).json({ message: `Error creating media: ${error}` });
+    console.error("Error creating media: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const updateMedia = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { type, details } = req.body;
 
-    const media = await Media.findById(id);
-    if (!media) {
-      await addLog("WARNING", `No media found with ID: ${id}`, false);
-      return res.status(404).json({ message: "Media not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid media ID format.",
+      });
     }
 
-    if (type) media.type = type;
-    if (details) media.details = details;
+    const updateFields = [
+      "problem_title",
+      "problem_body",
+      "recovery_title",
+      "recovery_body",
+      "enabled",
+    ];
+    const updateData: { [key: string]: any } = {};
 
-    await media.save();
+    updateFields.forEach((field) => {
+      if (field in req.body) {
+        updateData[field] = req.body[field];
+      }
+    });
 
-    const user = await User.findById(media.user_id);
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        status: "fail",
+        message: "No valid update fields provided.",
+      });
+    }
 
-    await addLog(
-      "INFO",
-      `Media [${media.type}] of user [${user?.username}] updated successfully`,
-      true
-    );
+    const updatedMedia = await Media.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).lean();
+
+    if (!updatedMedia) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Media not found",
+      });
+    }
+
     res.status(200).json({
-      message: `Media [${media.type}] of user [${user?.username}] updated successfully`,
-      media,
+      status: "success",
+      message: `Media [${id}] updated successfully`,
+      data: updatedMedia,
     });
   } catch (error) {
-    await addLog("ERROR", `Error updating media: ${error}`, false);
-    res.status(500).json({ message: `Error updating media: ${error}` });
+    console.error("Error updating media: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -121,26 +190,30 @@ const deleteMedia = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const media = await Media.findByIdAndDelete(id);
-    if (!media) {
-      await addLog("WARNING", `No media found with ID: ${id}`, false);
-      return res.status(404).json({ message: "Media not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid media ID format.",
+      });
     }
 
-    const user = await User.findById(media.user_id);
+    const deletedMedia = await Media.findByIdAndDelete(id).lean();
 
-    await addLog(
-      "INFO",
-      `Media [${media.type}] of user [${user?.username}] deleted successfully`,
-      true
-    );
+    if (!deletedMedia) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Media not found",
+      });
+    }
+
     res.status(200).json({
-      message: `Media [${media.type}] of user [${user?.username}] deleted successfully`,
+      status: "success",
+      message: `Media [${deletedMedia.type}] of user [${deletedMedia.user_id}] deleted successfully`,
     });
   } catch (error) {
-    await addLog("ERROR", `Error deleting media: ${error}`, false);
-    res.status(500).json({ message: `Error deleting media: ${error}` });
+    console.error("Error deleting media:", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-export { getMedia, getMediaList, createMedia, updateMedia, deleteMedia };
+export { getMedia, getMediaUser, createMedia, updateMedia, deleteMedia };

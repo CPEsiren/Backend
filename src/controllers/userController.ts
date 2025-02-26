@@ -1,131 +1,148 @@
-import { addLog } from "../services/logService";
 import { Request, Response } from "express";
 import { User } from "../models/User";
-import bcrypt from "bcrypt";
+import mongoose from "mongoose";
+import { createActivityLog } from "./LogUserController";
 
 const getUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findById(id).select("-password");
-    if (!user) {
-      await addLog("WARNING", `No user found with ID: ${id}`, false);
-      return res.status(404).json({ message: "User not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
     }
 
-    await addLog("INFO", "User retrieved successfully", false);
-    res.status(200).json(user);
+    const user = await User.findById(id).select("-password -__v").lean().exec();
+
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "User retrieved successfully",
+      user,
+    });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving user: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error retrieving user: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
 const getUsers = async (req: Request, res: Response) => {
   try {
-    const { role, isActive } = req.query;
+    const users = await User.find().select("-password -__v").lean().exec();
 
-    const query: any = {};
-    if (role) query.role = role;
-    if (isActive !== undefined) query.isActive = isActive === "true";
+    if (users.length === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No users found",
+      });
+    }
 
-    const users = await User.find(query)
-      .select("-password")
-      .sort({ username: 1 });
-
-    await addLog("INFO", "Users retrieved successfully", false);
     res.status(200).json({
+      status: "success",
+      message: "Users retrieved successfully",
       users,
     });
   } catch (error) {
-    await addLog("ERROR", `Error retrieving users: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error retrieving users: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-const createUser = async (req: Request, res: Response) => {
-  try {
-    const { username, email, password, role } = req.body;
-
-    if (!username || !email || !password) {
-      await addLog("WARNING", "Missing required fields", false);
-      return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser) {
-      await addLog("WARNING", "Username or email already exists", false);
-      return res
-        .status(409)
-        .json({ message: "Username or email already exists" });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new User({
-      username,
-      email,
-      password: hashedPassword,
-      role: role || "viewer",
-      isActive: true,
-    });
-
-    await newUser.save();
-
-    const userResponse = newUser.toObject();
-    delete userResponse.password;
-
-    await addLog(
-      "INFO",
-      `User [${userResponse.username}]created successfully`,
-      true
-    );
-    res.status(201).json({
-      message: `User [${userResponse.username}]created successfully`,
-      user: userResponse,
-    });
-  } catch (error) {
-    await addLog("ERROR", `Error creating user: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const updateUser = async (req: Request, res: Response) => {
+const getRole = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { username, email, role, isActive } = req.body;
 
-    const user = await User.findById(id);
-    if (!user) {
-      await addLog("WARNING", `No user found with ID: ${id}`, false);
-      return res.status(404).json({ message: "User not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
     }
 
-    if (username) user.username = username;
-    if (email) user.email = email;
-    if (role) user.role = role;
-    if (isActive !== undefined) user.isActive = isActive;
+    const user = await User.findById(id).select("role").lean().exec();
 
-    await user.save();
+    if (!user) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
 
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    await addLog(
-      "INFO",
-      `User [${userResponse.username}] updated successfully`,
-      true
-    );
     res.status(200).json({
-      message: `User [${userResponse.username}] updated successfully`,
-      user: userResponse,
+      status: "success",
+      message: "User role retrieved successfully",
+      role: user.role,
     });
   } catch (error) {
-    await addLog("ERROR", `Error updating user: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error retrieving user role: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
+  }
+};
+
+export const updateUserRole = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    const NOC = req.body.NOC;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
+    }
+
+    if (!role) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Role is required to update a user.",
+      });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { role },
+      { new: true, runValidators: true, select: "username role" },
+    ).lean();
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+     // Log for activity
+         const username = req.body.userName || "system";
+         const userdochangerole = req.body.userRole || "system";
+         await createActivityLog(
+           username,
+           userdochangerole,
+           `Updated role of: ${NOC}`
+         );
+
+    res.status(200).json({
+      status: "success",
+      message: `User [${updatedUser.username}] role updated successfully.`,
+      data: {
+        user: {
+          id: updatedUser._id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error updating user role: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
@@ -133,20 +150,36 @@ const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findByIdAndDelete(id);
-    if (!user) {
-      await addLog("WARNING", `No user found with ID: ${id}`, false);
-      return res.status(404).json({ message: "User not found" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid user ID format.",
+      });
     }
 
-    await addLog("INFO", `User [${user.username}] deleted successfully`, true);
-    res
-      .status(200)
-      .json({ message: `User [${user.username}] deleted successfully` });
+    const deletedUser = await User.findByIdAndDelete(id)
+      .select("username")
+      .lean();
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        status: "fail",
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: `User [${deletedUser.username}] deleted successfully`,
+      data: {
+        deletedUserId: id,
+        deletedUsername: deletedUser.username,
+      },
+    });
   } catch (error) {
-    await addLog("ERROR", `Error deleting user: ${error}`, false);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error deleting user: ", error);
+    res.status(500).json({ status: "fail", message: "Internal server error" });
   }
 };
 
-export { getUser, getUsers, createUser, updateUser, deleteUser };
+export { getUser, getUsers, getRole, deleteUser };

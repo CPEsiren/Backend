@@ -1,8 +1,10 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export interface IData extends Document {
-  value: number;
-  current_value: number;
+export interface ITrend extends Document {
+  min_value: number;
+  max_value: number;
+  avg_value: number;
+  num_values: number;
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
@@ -11,10 +13,12 @@ export interface IData extends Document {
   };
 }
 
-const dataSchema: Schema<IData> = new mongoose.Schema(
+const trendSchema: Schema<ITrend> = new mongoose.Schema(
   {
-    value: { type: Number, required: true },
-    current_value: { type: Number, required: true },
+    min_value: { type: Number, required: true },
+    max_value: { type: Number, required: true },
+    avg_value: { type: Number, required: true },
+    num_values: { type: Number, required: true },
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
@@ -34,10 +38,10 @@ const dataSchema: Schema<IData> = new mongoose.Schema(
     timeseries: {
       timeField: "timestamp",
       metaField: "metadata",
-      granularity: "seconds",
+      granularity: "minutes",
     },
-    expireAfterSeconds: 604800,
+    expireAfterSeconds: 31556926,
   }
 );
 
-export default mongoose.model<IData>("Data", dataSchema);
+export default mongoose.model<ITrend>("Trend", trendSchema);
