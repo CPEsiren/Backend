@@ -3,7 +3,7 @@ services:
   cpe-siren:
     build: .
     ports:
-      - 3009:3000
+      - 5001:3000
     depends_on:
       - mongodb
 
