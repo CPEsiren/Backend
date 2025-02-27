@@ -15,15 +15,15 @@ import LogUser from "./LogUser_api";
 
 export const routes = express.Router();
 
-routes.use("/host", Host);
-routes.use("/template", Template);
-routes.use("/item", Item);
-routes.use("/data", Data);
-routes.use("/trigger", Trigger);
-routes.use("/event", Event);
-routes.use("/media", Media);
-routes.use("/user", User);
-routes.use("/dashboard", Dashbroad);
-routes.use("/authen", Authen);
-routes.use("/email", Email);
-routes.use("/loguser", LogUser);
+routes.use("/api/host", Host);
+routes.use("/api/template", Template);
+routes.use("/api/item", Item);
+routes.use("/api/data", Data);
+routes.use("/api/trigger", Trigger);
+routes.use("/api/event", Event);
+routes.use("/api/media", Media);
+routes.use("/api/user", User);
+routes.use("/api/dashboard", Dashbroad);
+routes.use("/api/authen", Authen);
+routes.use("/api/email", Email);
+routes.use("/api/loguser", LogUser);
