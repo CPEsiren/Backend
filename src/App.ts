@@ -23,7 +23,7 @@ async function start() {
       next();
     });
 
-    app.use("/", routes);
+    app.use("/api", routes);
 
     await setupSchedules();
   } catch (err) {
