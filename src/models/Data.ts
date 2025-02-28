@@ -14,7 +14,7 @@ export interface IData extends Document {
 const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: Number, required: true },
-    current_value: { type: [Number], required: true },
+    current_value: [{ type: Number }],
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
