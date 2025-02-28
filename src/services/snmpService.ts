@@ -31,6 +31,8 @@ const statusInterface: { [key: number]: string } = {
   7: "lowerLayerDown",
 };
 
+const MAX_COUNTER_VALUE = 4294967295;
+
 export async function fetchAndStoreSnmpDataForItem(item: IItem) {
   if (!item.isBandwidth && !item.isOverview) {
     try {
