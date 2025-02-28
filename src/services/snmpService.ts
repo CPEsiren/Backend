@@ -11,7 +11,6 @@ import Item, { IItem } from "../models/Item";
 import mongoose from "mongoose";
 import snmp from "net-snmp";
 import Trigger from "../models/Trigger";
-import { start } from "repl";
 
 interface InterfaceItem {
   item_name: string;
@@ -89,7 +88,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }).sort({ timestamp: -1 });
 
           if (latestData) {
-            const previousValue = latestData.current_value;
+            const previousValue = latestData.current_value[0];
             const previousTimestamp = new Date(latestData.timestamp as Date);
 
             if (currentValue < previousValue) {
@@ -169,7 +168,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
                   },
                   timestamp: currentTimestamp,
                   value: bandwidthUtilization.toFixed(2),
-                  current_value: bandwidthUtilization.toFixed(2),
+                  current_value: [bandwidthUtilization.toFixed(2)],
                 });
                 await bandwidthData.save();
                 // console.log(
@@ -200,7 +199,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           },
           timestamp: currentTimestamp,
           value: value,
-          current_value: currentValue,
+          current_value: [currentValue],
         });
 
         // Save the data to the database
@@ -278,18 +277,17 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
         return;
       }
 
-      const sum = result.reduce((total: number, varbind: any) => {
+      const current_Value: number[] = [];
+      result.reduce((total: number[], varbind: any) => {
         if (!snmp.isVarbindError(varbind)) {
-          total += parseFloat(varbind.value.toString());
+          current_Value.push(parseFloat(varbind.value.toString()));
         }
         return total;
-      }, 0);
+      });
 
-      const currentValue = parseFloat(sum.toString());
       const currentTimestamp = new Date();
 
       let value: number = 0;
-      let deltaValue = 0;
       let changePerSecond: number = 0;
 
       const latestData = await Data.findOne({
@@ -298,15 +296,30 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
       }).sort({ timestamp: -1 });
 
       if (latestData) {
-        const previousValue = latestData.current_value;
+        const deltaAll = [];
+
+        const previousValue: number[] = latestData.current_value;
         const previousTimestamp = new Date(latestData.timestamp as Date);
 
-        deltaValue = currentValue - previousValue;
+        for (let i = 0; i < current_Value.length; i++) {
+          const previous = previousValue[i];
+          const current = current_Value[i];
+
+          if (current < previous) {
+            deltaAll.push(MAX_COUNTER_VALUE - previous + current);
+          } else {
+            deltaAll.push(current - previous);
+          }
+        }
+
+        const sumDelta = deltaAll.reduce((sum: number, delta: number) => {
+          return sum + delta;
+        }, 0);
 
         const timeDifferenceInSeconds =
           (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
 
-        changePerSecond = (deltaValue * 8) / timeDifferenceInSeconds;
+        changePerSecond = (sumDelta * 8) / timeDifferenceInSeconds;
 
         value = changePerSecond;
       }
@@ -319,7 +332,7 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
         },
         timestamp: currentTimestamp,
         value: value,
-        current_value: currentValue,
+        current_value: current_Value,
       });
 
       await newData.save();
