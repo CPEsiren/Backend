@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IData extends Document {
   value: number;
-  current_value: number;
+  current_value: number[];
   timestamp: Date;
   metadata: {
     host_id: mongoose.Types.ObjectId;
@@ -14,7 +14,7 @@ export interface IData extends Document {
 const dataSchema: Schema<IData> = new mongoose.Schema(
   {
     value: { type: Number, required: true },
-    current_value: { type: Number, required: true },
+    current_value: { type: [Number], required: true },
     timestamp: { type: Date, required: true },
     metadata: {
       host_id: {
