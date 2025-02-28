@@ -284,11 +284,9 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
       }
 
       const current_Value: number[] = [];
-      result.reduce((total: number[], varbind: any) => {
-        if (!snmp.isVarbindError(varbind)) {
-          current_Value.push(parseFloat(varbind.value.toString()));
-        }
-        return total;
+
+      result.forEach((varbind: any) => {
+        current_Value.push(parseFloat(varbind.value.toString()));
       });
 
       const currentTimestamp = new Date();
@@ -301,7 +299,7 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
         "metadata.host_id": host._id,
       }).sort({ timestamp: -1 });
 
-      if (latestData) {
+      if (latestData && latestData.current_value.length > 0) {
         const deltaAll = [];
 
         const previousValue: number[] = latestData.current_value;
@@ -318,9 +316,10 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
           }
         }
 
-        const sumDelta = deltaAll.reduce((sum: number, delta: number) => {
-          return sum + delta;
-        }, 0);
+        let sumDelta: number = 0;
+        deltaAll.forEach((delta) => {
+          sumDelta += delta;
+        });
 
         const timeDifferenceInSeconds =
           (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
@@ -337,7 +336,7 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
           isBandwidth: item.isBandwidth,
         },
         timestamp: currentTimestamp,
-        value: value,
+        value: value as number,
         current_value: current_Value,
       });
 
