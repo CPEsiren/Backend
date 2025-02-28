@@ -90,7 +90,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
             const previousValue = latestData.current_value;
             const previousTimestamp = new Date(latestData.timestamp as Date);
 
+            if (currentValue < previousValue) {
+              deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue;
+            } else {
             deltaValue = currentValue - previousValue;
+            }
 
             const timeDifferenceInSeconds =
               (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
