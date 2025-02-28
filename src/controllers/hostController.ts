@@ -146,6 +146,27 @@ export const createHost = async (req: Request, res: Response) => {
 
     await newHost.save();
 
+    let itemDocuments = [
+      {
+        item_name: "Total Inbound Traffic",
+        oid: "1.3.6.1.2.1.2.2.1.10",
+        type: "counter",
+        unit: "bit",
+        interval: 60,
+        isOverview: true,
+        host_id: newHost._id,
+      },
+      {
+        item_name: "Total Outbound Traffic",
+        oid: "1.3.6.1.2.1.2.2.1.10",
+        type: "counter",
+        unit: "bit",
+        interval: 60,
+        isOverview: true,
+        host_id: newHost._id,
+      },
+    ];
+
     if (Array.isArray(items) && items.length > 0) {
       const item = items.map((item) => ({
         ...item,
@@ -153,43 +174,19 @@ export const createHost = async (req: Request, res: Response) => {
         host_id: newHost._id,
       }));
 
-      const itemDocuments = [
-        {
-          item_name: "Total Inbound Traffic",
-          oid: "1.3.6.1.2.1.2.2.1.10",
-          type: "counter",
-          unit: "bit",
-          interval: 60,
-          isOverview: true,
-          host_id: newHost._id,
-        },
-        {
-          item_name: "Total Outbound Traffic",
-          oid: "1.3.6.1.2.1.2.2.1.10",
-          type: "counter",
-          unit: "bit",
-          interval: 60,
-          isOverview: true,
-          host_id: newHost._id,
-        },
-        ...item,
-      ];
-
-      const insertedItems = await Item.insertMany(itemDocuments);
-      insertedItems.forEach((item) => scheduleItem(item));
-      newHost.items = insertedItems.map((item) => item._id);
-      await newHost.save();
+      itemDocuments = [...itemDocuments, ...item];
     }
+
+    const insertedItems = await Item.insertMany(itemDocuments);
+    insertedItems.forEach((item) => scheduleItem(item));
+    newHost.items = insertedItems.map((item) => item._id);
+    await newHost.save();
 
     const createdHost = await Host.findById(newHost._id).lean();
     // Log for activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(
-      username,
-      role,
-      `Created host: ${hostname}`
-    );
+    await createActivityLog(username, role, `Created host: ${hostname}`);
 
     res.status(201).json({
       status: "success",
@@ -249,14 +246,10 @@ export const deleteHost = async (req: Request, res: Response) => {
         "metadata.host_id": new mongoose.Types.ObjectId(host_id),
       }),
     ]);
-     // Log for activity
-     const username = req.body.userName || "system";
-     const role = req.body.userRole || "system";
-     await createActivityLog(
-       username,
-       role,
-       `Deleted host: ${hostname}`
-     );
+    // Log for activity
+    const username = req.body.userName || "system";
+    const role = req.body.userRole || "system";
+    await createActivityLog(username, role, `Deleted host: ${hostname}`);
 
     res.status(200).json({
       status: "success",
@@ -347,13 +340,22 @@ export const updateHost = async (req: Request, res: Response) => {
 
     // Generate the change summary for logging
     const changes = Object.keys(updateData)
-      .filter(key => JSON.stringify(updateData[key]) !== JSON.stringify(originalHost[key as keyof typeof originalHost]))
-      .map(key => `${key}: ${JSON.stringify(originalHost[key as keyof typeof originalHost])} → ${JSON.stringify(updateData[key])}`)
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key]) !==
+          JSON.stringify(originalHost[key as keyof typeof originalHost])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalHost[key as keyof typeof originalHost]
+          )} → ${JSON.stringify(updateData[key])}`
+      )
       .join(", ");
 
     // Log activity
     const username = req.body.userName || "system";
-    const role = req.body.userRole  || "system";
+    const role = req.body.userRole || "system";
     await createActivityLog(
       username,
       role,

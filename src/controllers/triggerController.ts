@@ -99,7 +99,6 @@ const createTrigger = async (req: Request, res: Response) => {
       "severity",
       "expression",
       "ok_event_generation",
-      "enabled",
       "expressionPart",
       "expressionRecoveryPart",
     ];
@@ -141,7 +140,7 @@ const createTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const items: [string, mongoose.Types.ObjectId][] = [];
+    const items: [string, mongoose.Types.ObjectId, number][] = [];
     const addedItemNames = new Set<string>();
 
     //parse expression
@@ -179,9 +178,12 @@ const createTrigger = async (req: Request, res: Response) => {
 
     for (const itemName of parsedItemsExp) {
       if (!addedItemNames.has(itemName)) {
-        const item = await Item.findOne({ item_name: itemName });
+        const item = await Item.findOne({
+          item_name: itemName,
+          host_id: host_id,
+        });
         if (item) {
-          items.push([itemName, item._id]);
+          items.push([itemName, item._id, 0]);
           addedItemNames.add(itemName);
         } else {
           if (
@@ -257,7 +259,33 @@ const updateTrigger = async (req: Request, res: Response) => {
       expressionRecoveryPart,
     } = req.body;
 
-    const items: [string, mongoose.Types.ObjectId][] = [];
+    if (expressionPart.duration) {
+      const expressionDuration = expressionPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
+    if (expressionRecoveryPart.duration) {
+      const expressionDuration = expressionRecoveryPart.duration;
+      const durationRegex = /^\d+[mhd]$/;
+
+      if (!durationRegex.test(expressionDuration)) {
+        return res.status(400).json({
+          status: "fail",
+          message:
+            "Invalid duration format. Must be a number followed by m, h, or d (e.g., 15m, 2h, 3d)",
+        });
+      }
+    }
+
+    const items: [string, mongoose.Types.ObjectId, number][] = [];
     const addedItemNames = new Set<string>();
 
     //parse expression
@@ -289,18 +317,41 @@ const updateTrigger = async (req: Request, res: Response) => {
       return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
     });
 
+    const triggerHost = await Trigger.findById(id).select("host_id").lean();
+
+    let type = "item";
+
     for (const itemName of parsedItemsExp) {
       if (!addedItemNames.has(itemName)) {
-        const item = await Item.findOne({ item_name: itemName });
+        const item = await Item.findOne({
+          item_name: itemName,
+          host_id: triggerHost?.host_id,
+        });
         if (item) {
-          items.push([itemName, item._id]);
+          items.push([itemName, item._id, 0]);
           addedItemNames.add(itemName);
+        } else {
+          if (
+            !(
+              itemName.includes("Device Status") ||
+              itemName.includes("Interface Operation Status") ||
+              itemName.includes("Interface Admin Status")
+            )
+          ) {
+            return res.status(400).json({
+              status: "fail",
+              message: `Item [${itemName}] not found`,
+            });
+          } else {
+            type = "host";
+          }
         }
       }
     }
 
     const trigger = await Trigger.findByIdAndUpdate(id, {
       trigger_name,
+      type,
       severity,
       expression,
       logicExpression,
