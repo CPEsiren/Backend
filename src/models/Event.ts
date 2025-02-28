@@ -3,16 +3,9 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IEvent extends Document {
   trigger_id: mongoose.Types.ObjectId;
   type: "item" | "host";
-  severity:
-    | "not classified"
-    | "information"
-    | "warning"
-    | "average"
-    | "high"
-    | "disaster";
+  severity: "warning" | "critical" | "disaster";
   hostname: string;
   status: "PROBLEM" | "RESOLVED";
-  value_alerted: number;
   message: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,14 +24,7 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
     },
     severity: {
       type: String,
-      enum: [
-        "not classified",
-        "information",
-        "warning",
-        "average",
-        "high",
-        "disaster",
-      ],
+      enum: ["warning", "critical", "disaster"],
       required: true,
     },
     hostname: {
@@ -49,7 +35,6 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
       type: String,
       enum: ["PROBLEM", "RESOLVED"],
     },
-    value_alerted: { type: Number, required: true },
     message: { type: String, required: true },
   },
   {
@@ -58,6 +43,6 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
 );
 
 // Compound index for efficient querying
-EventSchema.index({ triggerId: 1, timestamp: -1 });
+EventSchema.index({ trigger_id: 1, timestamp: -1 });
 
 export default mongoose.model<IEvent>("Event", EventSchema);

@@ -3,7 +3,7 @@ import {
   evaluateHost,
   handleHasTrigger,
   handleNotHasTrigger,
-  hasTrigger,
+  checkCondition,
 } from "./alertService";
 import Host, { IauthenV3 } from "../models/Host";
 import Data from "../models/Data";
@@ -94,7 +94,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
             if (currentValue < previousValue) {
               deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue;
             } else {
-            deltaValue = currentValue - previousValue;
+              deltaValue = currentValue - previousValue;
             }
 
             const timeDifferenceInSeconds =
@@ -176,9 +176,10 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
                 //     bandwidthData.metadata.item_id
                 //   } : ${bandwidthData.value}`
                 // );
-                await hasTrigger(
+                await checkCondition(
                   host._id as mongoose.Types.ObjectId,
-                  itembandwidth
+                  itembandwidth,
+                  bandwidthUtilization
                 );
               }
             }
@@ -210,7 +211,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         //   } : ${newData.value}`
         // );
 
-        await hasTrigger(host._id as mongoose.Types.ObjectId, item);
+        await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
       }
     } catch (error) {
       console.log(
@@ -274,6 +275,11 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
       session.close();
 
       if (snmp.isVarbindError(result)) {
+        console.log(
+          `[${new Date().toLocaleString()}] fetchAndStoreTotalTraffic ${
+            item.item_name
+          } : ${result}`
+        );
         return;
       }
 
@@ -337,7 +343,7 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
 
       await newData.save();
 
-      await hasTrigger(host._id as mongoose.Types.ObjectId, item);
+      await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
     }
   } catch (error) {
     console.log(
@@ -393,11 +399,11 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
           [oid_admin, oid_oper],
           async (error: any, varbinds: any) => {
             if (error || snmp.isVarbindError(varbinds[0])) {
-              console.log(
-                `[${new Date().toLocaleString()}] checkInterfaceStatus ${
-                  iface.interface_name
-                } : ${error}`
-              );
+              // console.log(
+              //   `[${new Date().toLocaleString()}] checkInterfaceStatus ${
+              //     iface.interface_name
+              //   } : ${error}`
+              // );
             } else {
               iface.interface_Adminstatus = statusInterface[varbinds[0].value];
               iface.interface_Operstatus = statusInterface[varbinds[1].value];

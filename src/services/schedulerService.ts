@@ -23,11 +23,21 @@ export async function setupSchedules() {
     await scheduleItem(item);
   }
 
+  // Schedule check Trigger
+  // await scheduleTriggers();
+
   // Schedule the hourly data summarization
   scheduleHourlySummarization();
 }
 
-export async function scheduleHost(host: any) {
+// async function scheduleTriggers() {
+//   setInterval(async () => {
+//     await sumTriggers();
+//     await handleTrigger();
+//   }, 30 * 1000);
+// }
+
+async function scheduleHost(host: any) {
   if (schedules[host._id]) {
     clearInterval(schedules[host._id]);
   }
@@ -77,7 +87,7 @@ export function clearSchedule(Id: string) {
   }
 }
 
-export function scheduleHourlySummarization() {
+function scheduleHourlySummarization() {
   const now = new Date();
   const nextHour = new Date(now);
   nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0); // Set to the next hour
