@@ -26,7 +26,7 @@ export const getAllItem = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching item.:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -102,7 +102,7 @@ export const createItem = async (req: Request, res: Response) => {
       unit: req.body.unit,
     });
     console.error("Error creating item: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -159,13 +159,11 @@ export const deleteItem = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error("Error fetching data between times:", error);
-      res
-        .status(500)
-        .json({ status: "fail", message: "Internal server error" });
+      res.status(500).json({ status: "fail", message: error });
     }
   } catch (error) {
     console.error("Error delete item: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -243,7 +241,7 @@ export const updateItem = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to update item:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -291,6 +289,6 @@ export const scanInterface = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to scan interfaces:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };

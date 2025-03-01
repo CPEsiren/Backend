@@ -21,7 +21,7 @@ export const getAllTemplate = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("Error fetching templates:", err);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: err });
   }
 };
 
@@ -65,7 +65,7 @@ export const createTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error creating template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -126,7 +126,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -167,6 +167,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };

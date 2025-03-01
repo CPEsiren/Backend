@@ -12,7 +12,7 @@ const getEvent = async (req: Request, res: Response) => {
 
     res.status(200).json(event);
   } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -34,7 +34,7 @@ const getEvents = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to retrieve events:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 

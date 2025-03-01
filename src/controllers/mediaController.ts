@@ -126,7 +126,7 @@ const createMedia = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error creating media: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -182,7 +182,7 @@ const updateMedia = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating media: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -212,7 +212,7 @@ const deleteMedia = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting media:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 

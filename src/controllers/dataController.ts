@@ -296,6 +296,6 @@ export const getItemBetween = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching data between times:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
