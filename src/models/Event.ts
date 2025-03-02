@@ -8,7 +8,7 @@ export interface IEvent extends Document {
   status: "PROBLEM" | "RESOLVED";
   message: string;
   createdAt: Date;
-  updatedAt: Date;
+  resolvedAt: Date;
 }
 
 const EventSchema: Schema<IEvent> = new mongoose.Schema(
@@ -36,9 +36,13 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
       enum: ["PROBLEM", "RESOLVED"],
     },
     message: { type: String, required: true },
+    resolvedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
-    timestamps: { createdAt: true, updatedAt: true },
+    timestamps: { createdAt: true, updatedAt: false },
   }
 );
 
