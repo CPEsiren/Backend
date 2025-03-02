@@ -1,6 +1,6 @@
 import { sendEmail } from "../services/mailService";
 import { sendLine } from "../services/lineService";
-import Media, { IMedia } from "../models/Media";
+import Media from "../models/Media";
 import Trigger, { ITrigger } from "../models/Trigger";
 import mongoose from "mongoose";
 import {
@@ -10,7 +10,7 @@ import {
 import Host, { IHost } from "../models/Host";
 import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
-import Item, { IItem } from "../models/Item";
+import { IItem } from "../models/Item";
 
 export async function checkCondition(
   host_id: mongoose.Types.ObjectId,
@@ -516,11 +516,7 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
   }
 }
 
-export async function sendNotificationDevice(
-  host: IHost,
-  title: string,
-  message: string
-) {
+export async function sendNotificationDevice(title: string, message: string) {
   try {
     const medias = await Media.find({ enabled: true });
 
@@ -538,21 +534,21 @@ export async function sendNotificationDevice(
             media.recipient.name
           }]`
         );
-        // await sendEmail(media.recipient.send_to, title, body);
+        await sendEmail(media.recipient.send_to, title, message);
       } else if (media.type === "line") {
         console.log(
           `[${new Date().toLocaleString()}] Sending line by [${
             media.recipient.name
           }]`
         );
-        // await sendLine(
-        //   media.recipient.send_to,
-        //   title,
-        //   body
-        // );
+        await sendLine(media.recipient.send_to, title, message);
       }
     });
-  } catch (error) {}
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] sendNotificationDevice : ${error}`
+    );
+  }
 }
 
 export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
@@ -567,22 +563,27 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       return;
     }
 
-    const replacement = {
+    const allItemandValue = trigger.items.map((item, index) => {
+      return `${item[index]} : ${trigger.valueItem[index]}`;
+    });
+
+    const replacement: Record<string, string> = {
       //Trigger
       "{TRIGGER.NAME}": trigger.trigger_name,
       "{TRIGGER.EXPRESSION}": trigger.expression,
-      "{TRIGGER.RECOVERY_EXPRESSION}":
+      "{TRIGGER.RESOLVED.EXPRESSION}":
         trigger.recovery_expression === ""
           ? "None"
           : trigger.recovery_expression,
       "{TRIGGER.SEVERITY}": trigger.severity,
+      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue.join("\n"),
       //Host
       "{HOST.NAME}": host?.hostname ?? event.hostname,
       "{HOST.IP}": host?.ip_address ?? "Unknown IP",
       //Event
       "{EVENT.STATUS}": event.status,
       "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString(),
-      "{EVENT.RECOVERY.TIMESTAMP}": event.resolvedAt
+      "{EVENT.RESOLVED.TIMESTAMP}": event.resolvedAt
         ? event.resolvedAt.toLocaleString()
         : "",
     };
@@ -596,18 +597,14 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
             trigger.severity
           } Sending email by [${media.recipient.name}]`
         );
-        // await sendEmail(media.recipient.send_to, title, body);
+        await sendEmail(media.recipient.send_to, title, body);
       } else if (media.type === "line") {
         console.log(
           `[${new Date().toLocaleString()}] Sending line by [${
             media.recipient.name
           }]`
         );
-        // await sendLine(
-        //   media.recipient.send_to,
-        //   title,
-        //   body
-        // );
+        await sendLine(media.recipient.send_to, title, body);
       }
     });
   } catch (error) {
@@ -628,16 +625,6 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
 
       const dependentTriggersHigher = await findDependentTriggerHigher(trigger);
       const dependentTriggersLower = await findDependentTriggerLower(trigger);
-      console.log(
-        `dependentTriggersHigher ${t.severity} : ${
-          dependentTriggersHigher.length
-        } = [${dependentTriggersHigher.map((t) => t.severity)}]`
-      );
-      console.log(
-        `dependentTriggersLower ${t.severity} : ${
-          dependentTriggersLower.length
-        } = [${dependentTriggersLower.map((t) => t.severity)}]`
-      );
 
       if (
         dependentTriggersHigher.length === 0 &&
@@ -840,7 +827,13 @@ async function recoverOrDownSeverity(trigger: ITrigger) {
         }
       );
       if (event) {
-        await sendNotificationItem(event, trigger);
+        const eventResolved = await Event.findOne({
+          _id: event._id,
+        });
+        await sendNotificationItem(
+          eventResolved ? eventResolved : event,
+          trigger
+        );
       }
     }
   } catch (error) {
