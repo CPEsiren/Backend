@@ -23,19 +23,9 @@ export async function setupSchedules() {
     await scheduleItem(item);
   }
 
-  // Schedule check Trigger
-  // await scheduleTriggers();
-
   // Schedule the hourly data summarization
   scheduleHourlySummarization();
 }
-
-// async function scheduleTriggers() {
-//   setInterval(async () => {
-//     await sumTriggers();
-//     await handleTrigger();
-//   }, 30 * 1000);
-// }
 
 async function scheduleHost(host: any) {
   if (schedules[host._id]) {
