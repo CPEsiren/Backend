@@ -177,6 +177,14 @@ export const updateItem = async (req: Request, res: Response) => {
         message: "Invalid item ID format.",
       });
     }
+    // Get the original host data for logging purposes
+    const originalItem: any = await Host.findById(item_id).lean();
+    if (!originalItem) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No item found with ID: ${item_id}`,
+      });
+    }
 
     const updateFields = ["item_name", "oid", "type", "unit", "interval"];
     const updateData: { [key: string]: any } = {};
@@ -227,10 +235,29 @@ export const updateItem = async (req: Request, res: Response) => {
 
     await scheduleItem(updatedItem);
 
+    // Generate the change summary for logging
+    const changes = Object.keys(updateData)
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key]) !==
+          JSON.stringify(originalItem[key as keyof typeof originalItem])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalItem[key as keyof typeof originalItem]
+          )} → ${JSON.stringify(updateData[key])}`
+      )
+      .join(", ");
+
     // Log activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Updated item:${item_id}`);
+    await createActivityLog(
+      username,
+      role,
+      `Updated host: ${updatedItem.item_name}. Changes: ${changes}`
+    );
 
     res.status(200).json({
       status: "success",

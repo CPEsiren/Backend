@@ -81,6 +81,14 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
+     const originalTemplate: any = await Template.findById(template_id).lean();
+        if (!originalTemplate) {
+          return res.status(404).json({
+            status: "fail",
+            message: `No template found with ID: ${template_id}`,
+          });
+        }
+
     const updateFields = ["template_name", "items", "description", "triggers"];
     const updateData: { [key: string]: any } = {};
 
@@ -110,13 +118,27 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
+    const changes = Object.keys(updateData)
+    .filter(
+      (key) =>
+        JSON.stringify(updateData[key]) !==
+        JSON.stringify(originalTemplate[key as keyof typeof originalTemplate])
+    )
+    .map(
+      (key) =>
+        `${key}: ${JSON.stringify(
+          originalTemplate[key as keyof typeof originalTemplate]
+        )} → ${JSON.stringify(updateData[key])}`
+    )
+    .join(", ");
+
     // Log for activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
     await createActivityLog(
       username,
       role,
-      `Updated template: ${template_name}`
+      `Updated host: ${updatedTemplate.template_name}. Changes: ${changes}`
     );
 
     res.status(200).json({

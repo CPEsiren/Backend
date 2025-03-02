@@ -264,6 +264,15 @@ const updateTrigger = async (req: Request, res: Response) => {
       thresholdDuration,
     } = req.body;
 
+    // Get the original trigger data for logging purposes
+    const originalTrigger: any = await Trigger.findById(id).lean();
+    if (!originalTrigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No trigger found with ID: ${id}`,
+      });
+    }
+
     if (expressionPart.duration) {
       const expressionDuration = expressionPart.duration;
       const durationRegex = /^\d+[mhd]$/;
@@ -354,7 +363,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const trigger = await Trigger.findByIdAndUpdate(id, {
+    // Prepare update data object
+    const updateData = {
       trigger_name,
       type,
       severity,
@@ -368,12 +378,37 @@ const updateTrigger = async (req: Request, res: Response) => {
       expressionPart,
       expressionRecoveryPart,
       thresholdDuration,
+    };
+
+    // Update the trigger
+    const trigger = await Trigger.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
     });
 
-    // Log activity
+    // Generate the change summary for logging
+    const changes = Object.keys(updateData)
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key as keyof typeof updateData]) !==
+          JSON.stringify(originalTrigger[key as keyof typeof originalTrigger])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalTrigger[key as keyof typeof originalTrigger]
+          )} → ${JSON.stringify(updateData[key as keyof typeof updateData])}`
+      )
+      .join(", ");
+
+    // Log activity with detailed changes
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Updated Trigger: ${trigger_name}`);
+    await createActivityLog(
+      username,
+      role,
+      `Updated Trigger: ${trigger_name}. Changes: ${changes}`
+    );
 
     res.status(200).json({
       status: "success",
