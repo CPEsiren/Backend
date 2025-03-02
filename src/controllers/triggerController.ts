@@ -299,7 +299,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const items: [string, mongoose.Types.ObjectId, number][] = [];
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const valueItem: number[] = [];
     const addedItemNames = new Set<string>();
 
     //parse expression
@@ -342,7 +343,8 @@ const updateTrigger = async (req: Request, res: Response) => {
           host_id: triggerHost?.host_id,
         });
         if (item) {
-          items.push([itemName, item._id, 0]);
+          items.push([itemName, item._id]);
+          valueItem.push(0);
           addedItemNames.add(itemName);
         } else {
           if (
