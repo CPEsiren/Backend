@@ -13,6 +13,7 @@ export interface ITrigger extends Document {
   recovery_expression: string;
   logicRecoveryExpression: string[];
   isRecoveryExpressionValid: boolean;
+  thresholdDuration: number;
   enabled: boolean;
   createdAt: Date;
   expressionPart: {
@@ -87,6 +88,10 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       type: Boolean,
       default: true,
     },
+    thresholdDuration: {
+      type: Number,
+      default: 0,
+    },
     enabled: {
       type: Boolean,
       default: true,
@@ -121,6 +126,15 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
   {
     timestamps: { createdAt: true, updatedAt: false },
   }
+);
+
+TriggerSchema.index(
+  {
+    trigger_name: 1,
+    severity: 1,
+    host_id: 1,
+  },
+  { unique: true }
 );
 
 export default mongoose.model<ITrigger>("Trigger", TriggerSchema);
