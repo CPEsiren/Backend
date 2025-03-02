@@ -8,7 +8,8 @@ export interface ITrigger extends Document {
   expression: string;
   logicExpression: string[];
   isExpressionValid: boolean;
-  items: [string, mongoose.Types.ObjectId, number][];
+  items: [string, mongoose.Types.ObjectId][];
+  valueItem: number[];
   ok_event_generation: "expression" | "recovery expression" | "none";
   recovery_expression: string;
   logicRecoveryExpression: string[];
@@ -69,7 +70,11 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       default: false,
     },
     items: {
-      type: [[String, Schema.Types.ObjectId, Number]],
+      type: [[String, Schema.Types.ObjectId]],
+      default: [],
+    },
+    valueItem: {
+      type: [Number],
       default: [],
     },
     ok_event_generation: {
