@@ -400,7 +400,6 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     });
 
                     await sendNotificationDevice(
-                      host,
                       `Interface ${iface.interface_name} Administator status changed.`,
                       message
                     );
@@ -415,7 +414,6 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     });
 
                     await sendNotificationDevice(
-                      host,
                       `Interface ${iface.interface_name} status changed.`,
                       message
                     );
@@ -496,7 +494,6 @@ export async function checkSnmpConnection(host_id: string) {
 
         if (!eventold) {
           await sendNotificationDevice(
-            host,
             `${host.hostname} [${host.ip_address}] Status`,
             message
           );
@@ -531,7 +528,6 @@ export async function checkSnmpConnection(host_id: string) {
 
         if (event) {
           await sendNotificationDevice(
-            host,
             `${host.hostname} [${host.ip_address}] Status`,
             message
           );
