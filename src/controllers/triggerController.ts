@@ -34,7 +34,7 @@ const getTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching trigger: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -75,7 +75,7 @@ const getTriggers = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching triggers: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -91,6 +91,7 @@ const createTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     } = req.body;
 
     const requiredFields = [
@@ -219,6 +220,7 @@ const createTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     });
 
     // Save the trigger
@@ -241,7 +243,7 @@ const createTrigger = async (req: Request, res: Response) => {
       severity: req.body.severity,
     });
     console.error("Error creating trigger:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: `${error}` });
   }
 };
 
@@ -257,6 +259,7 @@ const updateTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     } = req.body;
 
     if (expressionPart.duration) {
@@ -362,6 +365,7 @@ const updateTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     });
 
     // Log activity
@@ -376,7 +380,7 @@ const updateTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating trigger: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -416,7 +420,7 @@ const deleteTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting trigger:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
