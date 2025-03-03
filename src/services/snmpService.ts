@@ -208,7 +208,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           },
           timestamp: currentTimestamp,
           value: value,
-          current_value: currentValue,
+          current_value: currentValue as Number[],
         });
 
         // Save the data to the database
