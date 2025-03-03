@@ -1,4 +1,4 @@
 import { differenceInDays } from "date-fns";
-export function isMoreThanSevenDays(startDate: Date, endDate: Date): boolean {
-  return differenceInDays(endDate, startDate) > 2;
+export function isMoreThanOneDays(startDate: Date, endDate: Date): boolean {
+  return differenceInDays(endDate, startDate) >= 1;
 }
