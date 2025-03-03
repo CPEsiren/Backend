@@ -10,7 +10,7 @@ export interface ITrigger extends Document {
   isExpressionValid: boolean;
   items: [string, mongoose.Types.ObjectId][];
   valueItem: number[];
-  ok_event_generation: "expression" | "recovery expression" | "none";
+  ok_event_generation: "expression" | "resolved expression" | "none";
   recovery_expression: string;
   logicRecoveryExpression: string[];
   isRecoveryExpressionValid: boolean;
@@ -79,7 +79,7 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
     },
     ok_event_generation: {
       type: String,
-      enum: ["expression", "recovery expression", "none"],
+      enum: ["expression", "resolved expression", "none"],
       required: true,
     },
     recovery_expression: {
