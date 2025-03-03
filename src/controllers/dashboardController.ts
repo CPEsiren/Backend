@@ -21,6 +21,7 @@ export async function getDashboardCounts(req: Request, res: Response) {
       triggerDisabledCount,
       userOnlineCount,
       problemEventCount,
+      resolvedEventCount,
     ] = await Promise.all([
       Host.countDocuments(),
       Item.countDocuments(),
@@ -33,6 +34,7 @@ export async function getDashboardCounts(req: Request, res: Response) {
       Trigger.countDocuments({ enabled: false }),
       User.countDocuments({ isActive: true }),
       Event.countDocuments({ status: "PROBLEM" }),
+      Event.countDocuments({ status: "RESOLVED" }),
     ]);
 
     const counts = {
@@ -59,7 +61,8 @@ export async function getDashboardCounts(req: Request, res: Response) {
       events: {
         total: eventCount,
         problem: problemEventCount,
-        resolved: eventCount - problemEventCount,
+        resolved: resolvedEventCount,
+        event: eventCount - problemEventCount - resolvedEventCount,
       },
       templates: {
         total: templateCount,
