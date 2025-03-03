@@ -72,7 +72,6 @@ export const createTemplate = async (req: Request, res: Response) => {
 export const updateTemplate = async (req: Request, res: Response) => {
   try {
     const template_id = req.params.id;
-    const template_name = req.body.template_name;
 
     if (!mongoose.Types.ObjectId.isValid(template_id)) {
       return res.status(400).json({
@@ -81,13 +80,13 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
-     const originalTemplate: any = await Template.findById(template_id).lean();
-        if (!originalTemplate) {
-          return res.status(404).json({
-            status: "fail",
-            message: `No template found with ID: ${template_id}`,
-          });
-        }
+    const originalTemplate: any = await Template.findById(template_id).lean();
+    if (!originalTemplate) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No template found with ID: ${template_id}`,
+      });
+    }
 
     const updateFields = ["template_name", "items", "description", "triggers"];
     const updateData: { [key: string]: any } = {};
@@ -119,18 +118,18 @@ export const updateTemplate = async (req: Request, res: Response) => {
     }
 
     const changes = Object.keys(updateData)
-    .filter(
-      (key) =>
-        JSON.stringify(updateData[key]) !==
-        JSON.stringify(originalTemplate[key as keyof typeof originalTemplate])
-    )
-    .map(
-      (key) =>
-        `${key}: ${JSON.stringify(
-          originalTemplate[key as keyof typeof originalTemplate]
-        )} → ${JSON.stringify(updateData[key])}`
-    )
-    .join(", ");
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key]) !==
+          JSON.stringify(originalTemplate[key as keyof typeof originalTemplate])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalTemplate[key as keyof typeof originalTemplate]
+          )} → ${JSON.stringify(updateData[key])}`
+      )
+      .join(", ");
 
     // Log for activity
     const username = req.body.userName || "system";
