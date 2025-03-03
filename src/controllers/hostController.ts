@@ -6,8 +6,12 @@ import Item from "../models/Item";
 import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
-import Trigger from "../models/Trigger";
+import Trigger, { ITrigger } from "../models/Trigger";
 import { createActivityLog } from "../controllers/LogUserController";
+import {
+  parseExpressionDetailed,
+  parseExpressionToItems,
+} from "../services/parserService";
 
 export const getAllHosts = async (req: Request, res: Response) => {
   try {
@@ -88,6 +92,7 @@ export const createHost = async (req: Request, res: Response) => {
       template_name,
       details,
       items,
+      triggers,
       authenV3,
     } = req.body;
 
@@ -183,6 +188,84 @@ export const createHost = async (req: Request, res: Response) => {
     await newHost.save();
 
     const createdHost = await Host.findById(newHost._id).lean();
+
+    if (triggers.length > 0) {
+      triggers.forEach(async (trigger: ITrigger) => {
+        const items: [string, mongoose.Types.ObjectId][] = [];
+        const valueItem: number[] = [];
+        const addedItemNames = new Set<string>();
+
+        //parse expression
+        const parsedItemsExp = new Set(
+          parseExpressionToItems(trigger.expression)
+        );
+
+        const logicExpression = parseExpressionDetailed(trigger.expression).map(
+          (item) => {
+            if (Array.isArray(item) && item.length === 3) {
+              return "false"; // แทนที่เงื่อนไขด้วย 'false'
+            }
+            return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+          }
+        );
+
+        if (trigger.recovery_expression) {
+          const parsedRecoveryItems = parseExpressionToItems(
+            trigger.recovery_expression
+          );
+          parsedRecoveryItems.forEach((item) => parsedItemsExp.add(item));
+        }
+
+        if (parsedItemsExp.size === 0) {
+          return;
+        }
+
+        const logicRecoveryExpression = parseExpressionDetailed(
+          trigger.recovery_expression
+        ).map((item) => {
+          if (Array.isArray(item) && item.length === 3) {
+            return "false"; // แทนที่เงื่อนไขด้วย 'false'
+          }
+          return item[0].toLowerCase(); // คงค่า 'or' หรือ 'and' ไว้
+        });
+
+        let type = "item";
+        for (const itemName of parsedItemsExp) {
+          if (!addedItemNames.has(itemName)) {
+            const item = await Item.findOne({
+              item_name: itemName,
+              host_id: newHost._id,
+            });
+            if (item) {
+              items.push([itemName, item._id]);
+              valueItem.push(0);
+              addedItemNames.add(itemName);
+            }
+          }
+        }
+
+        const newTrigger = new Trigger({
+          trigger_name: trigger.trigger_name,
+          type,
+          host_id: newHost._id,
+          severity: trigger.severity,
+          expression: trigger.expression,
+          logicExpression,
+          items,
+          ok_event_generation: trigger.ok_event_generation,
+          recovery_expression: trigger.recovery_expression,
+          logicRecoveryExpression,
+          enabled: true,
+          expressionPart: trigger.expressionPart,
+          expressionRecoveryPart: trigger.expressionRecoveryPart,
+          thresholdDuration: trigger.thresholdDuration,
+        });
+
+        // Save the trigger
+        await newTrigger.save();
+      });
+    }
+
     // Log for activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
@@ -244,6 +327,9 @@ export const deleteHost = async (req: Request, res: Response) => {
       }),
       Trend.deleteMany({
         "metadata.host_id": new mongoose.Types.ObjectId(host_id),
+      }),
+      Trigger.deleteMany({
+        host_id: new mongoose.Types.ObjectId(host_id),
       }),
     ]);
     // Log for activity

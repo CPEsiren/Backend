@@ -13,8 +13,9 @@ interface ITemplate {
     trigger_name: string;
     severity: "warning" | "critical" | "disaster";
     expression: string;
-    ok_event_generation: "expression" | "recovery expression" | "none";
+    ok_event_generation: "expression" | "resolved expression" | "none";
     recovery_expression: string;
+    thresholdDuration: number;
     expressionPart: {
       item: string;
       operation: string;
@@ -53,7 +54,7 @@ const templateSchema = new mongoose.Schema({
       expression: { type: String },
       ok_event_generation: {
         type: String,
-        enum: ["expression", "recovery expression", "none"],
+        enum: ["expression", "resolved expression", "none"],
       },
       recovery_expression: { type: String },
       expressionPart: [
