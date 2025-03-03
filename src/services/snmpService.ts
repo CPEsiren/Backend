@@ -58,16 +58,16 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           });
         });
 
-        // Close the SNMP session
-        session.close();
-
         // Process the result
         if (snmp.isVarbindError(result)) {
           return;
         }
+        session.close();
 
         // Get the current value
-        const currentValue = parseFloat(result.value.toString());
+        const currentValue = parseFloat(
+          result.value.toString() ? result.value.toString() : 0
+        );
         const currentTimestamp = new Date();
 
         let value: number = 0;
@@ -178,6 +178,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               }
             }
           }
+          // Close the SNMP session
         } else if (
           item.type.toLocaleLowerCase() === "integer" &&
           !item.isBandwidth
@@ -199,11 +200,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Save the data to the database
         await newData.save();
-        // console.log(
-        //   `[${new Date().toLocaleString()}] Store Data ${
-        //     newData.metadata.item_id
-        //   } : ${newData.value}`
-        // );
 
         await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
       }
@@ -404,7 +400,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                       message
                     );
                   } else if (!String(old_oper).includes(String(new_oper))) {
-                    const message = `Interface ${iface.interface_name} Operational Status changed from ${old_admin} --> ${new_admin}`;
+                    const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_admin} --> ${new_admin}`;
                     await Event.create({
                       type: "host",
                       severity: "warning",
