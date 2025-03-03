@@ -126,7 +126,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
     await createActivityLog(
       username,
       userdochangerole,
-      `Updated role of: ${NOC}`
+      `Updated role of ${NOC} to "${role}"`
     );
 
     res.status(200).json({
