@@ -418,7 +418,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     });
 
                     await sendNotificationDevice(
-                      `Interface ${iface.interface_name} status changed.`,
+                      `[${host.hostname}] Interface ${iface.interface_name} status changed.`,
                       message
                     );
                   }
