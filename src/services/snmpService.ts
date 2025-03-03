@@ -70,34 +70,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Process the result
         if (snmp.isVarbindError(result)) {
-          return;
-        }
-        session.close();
-
-        let value: number = 0;
-
-        if (typeof result.value === "number" && !isNaN(result.value)) {
-          value = result.value;
-        } else if (typeof result.value === "string") {
-          const parsedValue = parseFloat(result.value);
-          if (!isNaN(parsedValue)) {
-            value = parsedValue;
-          } else {
-            console.log(
-              `Invalid value for item ${item.item_name}: ${result.value}`
-            );
-            session.close();
-            return;
-          }
-        } else {
-          console.log(
-            `Unexpected value type for item ${
-              item.item_name
-            }: ${typeof result.value}`
-          );
           session.close();
           return;
         }
+
+        session.close();
 
         // Get the current value
         const currentValue = parseFloat(
@@ -105,6 +82,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         );
         const currentTimestamp = new Date();
 
+        let value: number = 0;
         let deltaValue = 0;
         let changePerSecond: number = 0;
 
@@ -116,11 +94,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }).sort({ timestamp: -1 });
 
           if (latestData) {
-            const previousValue =
-              latestData.current_value[0] === undefined
-                ? 0
-                : latestData.current_value[0];
+            const previousValue = isNaN(latestData.current_value[0])
+              ? 0
+              : latestData.current_value[0];
             const previousTimestamp = new Date(latestData.timestamp as Date);
+            console.log(previousValue, "  ", currentValue);
 
             if (currentValue < previousValue) {
               deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue;
