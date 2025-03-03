@@ -74,8 +74,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           return;
         }
 
-        session.close();
-
         // Get the current value
         const currentValue = parseFloat(
           result.value.toString() ? result.value : 0
@@ -109,7 +107,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
 
             changePerSecond = deltaValue / timeDifferenceInSeconds;
-            console.log(changePerSecond);
 
             value = changePerSecond;
 
@@ -215,6 +212,8 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Save the data to the database
         await newData.save();
+
+        session.close();
 
         await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
       }
