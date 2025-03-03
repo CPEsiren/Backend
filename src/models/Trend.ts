@@ -40,7 +40,7 @@ const trendSchema: Schema<ITrend> = new mongoose.Schema(
       metaField: "metadata",
       granularity: "minutes",
     },
-    expireAfterSeconds: 31556926,
+    expireAfterSeconds: 15778463,
   }
 );
 

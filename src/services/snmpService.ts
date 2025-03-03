@@ -394,7 +394,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                   const new_oper = iface.interface_Operstatus;
 
                   if (!String(old_admin).includes(String(new_admin))) {
-                    const message = `Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
+                    const message = `[${host.hostname}] Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
                     await Event.create({
                       type: "host",
                       severity: "warning",
@@ -408,7 +408,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                       message
                     );
                   } else if (!String(old_oper).includes(String(new_oper))) {
-                    const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_admin} --> ${new_admin}`;
+                    const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_oper} --> ${new_oper}`;
                     await Event.create({
                       type: "host",
                       severity: "warning",
@@ -418,7 +418,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     });
 
                     await sendNotificationDevice(
-                      `Interface ${iface.interface_name} status changed.`,
+                      `[${host.hostname}] Interface ${iface.interface_name} status changed.`,
                       message
                     );
                   }
