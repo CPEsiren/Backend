@@ -77,7 +77,7 @@ export async function checkCondition(
         (pos) => trigger.logicExpression[pos]
       );
 
-      if (trigger.ok_event_generation === "recovery expression") {
+      if (trigger.ok_event_generation === "resolved expression") {
         const parsedRecoveryExpression = parseExpressionDetailed(
           trigger.recovery_expression
         );
@@ -445,7 +445,7 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
     const sumLogicExpr = trigger.isExpressionValid;
     const sumLogicRecoveryExpr = trigger.isRecoveryExpressionValid;
 
-    if (trigger.ok_event_generation === "recovery expression") {
+    if (trigger.ok_event_generation === "resolved expression") {
       if (sumLogicExpr && sumLogicRecoveryExpr) {
         await recoverOrDownSeverity(trigger);
         if (schedulesWaitAlert[trigger._id as string]) {
