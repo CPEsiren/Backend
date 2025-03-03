@@ -82,7 +82,9 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }).sort({ timestamp: -1 });
 
           if (latestData) {
-            const previousValue = latestData.current_value[0];
+            const previousValue = latestData.current_value[0]
+              ? latestData.current_value[0]
+              : 0;
             const previousTimestamp = new Date(latestData.timestamp as Date);
 
             if (currentValue < previousValue) {
