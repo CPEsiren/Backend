@@ -64,10 +64,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }
         });
 
-        if (!result) {
-          return;
-        }
-
         // Process the result
         if (snmp.isVarbindError(result)) {
           session.close();
@@ -76,9 +72,13 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Get the current value
         const currentValue: number[] = [];
-        currentValue.push(
-          parseFloat(result.value.toString() ? result.value : 0)
-        );
+        result.reduce((total: number[], varbind: any) => {
+          if (!snmp.isVarbindError(varbind)) {
+            currentValue.push(parseFloat(varbind.value.toString()));
+          }
+          return total;
+        });
+
         const currentTimestamp = new Date();
 
         let value: number = 0;
@@ -93,15 +93,14 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }).sort({ timestamp: -1 });
 
           if (latestData) {
-            const previousValue = isNaN(latestData.current_value[0])
-              ? 0
-              : latestData.current_value[0];
+            const previousValue: number[] = latestData.current_value;
             const previousTimestamp = new Date(latestData.timestamp as Date);
 
-            if (currentValue[0] < previousValue) {
-              deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue[0];
+            if (currentValue[0] < previousValue[0]) {
+              deltaValue =
+                MAX_COUNTER_VALUE - previousValue[0] + currentValue[0];
             } else {
-              deltaValue = currentValue[0] - previousValue;
+              deltaValue = currentValue[0] - previousValue[0];
             }
 
             const timeDifferenceInSeconds =
