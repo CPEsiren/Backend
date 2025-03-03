@@ -19,7 +19,7 @@ export const getLogUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error get log user : ", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: error });
   }
 };
 
@@ -30,8 +30,9 @@ export const createLogUser = async (req: Request, res: Response) => {
 
     // Validate required fields
     if (!username || !role || !activity) {
-      return res.status(400).json({ 
-        message: "Missing required fields. username, role, and activity are required."
+      return res.status(400).json({
+        message:
+          "Missing required fields. username, role, and activity are required.",
       });
     }
 
@@ -39,7 +40,7 @@ export const createLogUser = async (req: Request, res: Response) => {
     const newLog = new LogUser({
       username,
       role,
-      activity
+      activity,
     });
 
     // Save to database
@@ -52,19 +53,23 @@ export const createLogUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error creating log: ", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: error });
   }
 };
 
 // Helper function to create logs from other controllers
-export const createActivityLog = async (username: string, role: string, activity: string) => {
+export const createActivityLog = async (
+  username: string,
+  role: string,
+  activity: string
+) => {
   try {
     const newLog = new LogUser({
       username,
       role,
-      activity
+      activity,
     });
-    
+
     await newLog.save();
     return true;
   } catch (error) {

@@ -34,7 +34,7 @@ export const getAllHosts = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching hosts:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -72,7 +72,7 @@ export const getHostById = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching host:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -203,7 +203,7 @@ export const createHost = async (req: Request, res: Response) => {
       hostgroup: req.body.hostgroup,
     });
     console.error("Error creating host:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -257,7 +257,7 @@ export const deleteHost = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to delete host:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -369,6 +369,6 @@ export const updateHost = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to update host:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };

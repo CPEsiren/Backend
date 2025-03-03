@@ -35,6 +35,6 @@ export const loginUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "An error occurred during login" });
+    res.status(500).json({ status: "fail", message: `${error}` });
   }
 };

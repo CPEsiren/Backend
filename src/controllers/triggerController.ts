@@ -34,7 +34,7 @@ const getTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching trigger: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -75,7 +75,7 @@ const getTriggers = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching triggers: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -91,6 +91,7 @@ const createTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     } = req.body;
 
     const requiredFields = [
@@ -140,7 +141,8 @@ const createTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const items: [string, mongoose.Types.ObjectId, number][] = [];
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const valueItem: number[] = [];
     const addedItemNames = new Set<string>();
 
     //parse expression
@@ -183,7 +185,8 @@ const createTrigger = async (req: Request, res: Response) => {
           host_id: host_id,
         });
         if (item) {
-          items.push([itemName, item._id, 0]);
+          items.push([itemName, item._id]);
+          valueItem.push(0);
           addedItemNames.add(itemName);
         } else {
           if (
@@ -219,6 +222,7 @@ const createTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     });
 
     // Save the trigger
@@ -241,7 +245,7 @@ const createTrigger = async (req: Request, res: Response) => {
       severity: req.body.severity,
     });
     console.error("Error creating trigger:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: `${error}` });
   }
 };
 
@@ -257,7 +261,17 @@ const updateTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
     } = req.body;
+
+    // Get the original trigger data for logging purposes
+    const originalTrigger: any = await Trigger.findById(id).lean();
+    if (!originalTrigger) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No trigger found with ID: ${id}`,
+      });
+    }
 
     if (expressionPart.duration) {
       const expressionDuration = expressionPart.duration;
@@ -285,7 +299,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const items: [string, mongoose.Types.ObjectId, number][] = [];
+    const items: [string, mongoose.Types.ObjectId][] = [];
+    const valueItem: number[] = [];
     const addedItemNames = new Set<string>();
 
     //parse expression
@@ -328,7 +343,8 @@ const updateTrigger = async (req: Request, res: Response) => {
           host_id: triggerHost?.host_id,
         });
         if (item) {
-          items.push([itemName, item._id, 0]);
+          items.push([itemName, item._id]);
+          valueItem.push(0);
           addedItemNames.add(itemName);
         } else {
           if (
@@ -349,7 +365,8 @@ const updateTrigger = async (req: Request, res: Response) => {
       }
     }
 
-    const trigger = await Trigger.findByIdAndUpdate(id, {
+    // Prepare update data object
+    const updateData = {
       trigger_name,
       type,
       severity,
@@ -362,12 +379,38 @@ const updateTrigger = async (req: Request, res: Response) => {
       enabled,
       expressionPart,
       expressionRecoveryPart,
+      thresholdDuration,
+    };
+
+    // Update the trigger
+    const trigger = await Trigger.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
     });
 
-    // Log activity
+    // Generate the change summary for logging
+    const changes = Object.keys(updateData)
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key as keyof typeof updateData]) !==
+          JSON.stringify(originalTrigger[key as keyof typeof originalTrigger])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalTrigger[key as keyof typeof originalTrigger]
+          )} → ${JSON.stringify(updateData[key as keyof typeof updateData])}`
+      )
+      .join(", ");
+
+    // Log activity with detailed changes
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Updated Trigger: ${trigger_name}`);
+    await createActivityLog(
+      username,
+      role,
+      `Updated Trigger: ${trigger_name}. Changes: ${changes}`
+    );
 
     res.status(200).json({
       status: "success",
@@ -376,7 +419,7 @@ const updateTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating trigger: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -416,7 +459,7 @@ const deleteTrigger = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting trigger:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 

@@ -30,7 +30,7 @@ const getUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error retrieving user: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -52,7 +52,7 @@ const getUsers = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error retrieving users: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -83,7 +83,7 @@ const getRole = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error retrieving user role: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -110,7 +110,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { role },
-      { new: true, runValidators: true, select: "username role" },
+      { new: true, runValidators: true, select: "username role" }
     ).lean();
 
     if (!updatedUser) {
@@ -120,14 +120,14 @@ export const updateUserRole = async (req: Request, res: Response) => {
       });
     }
 
-     // Log for activity
-         const username = req.body.userName || "system";
-         const userdochangerole = req.body.userRole || "system";
-         await createActivityLog(
-           username,
-           userdochangerole,
-           `Updated role of: ${NOC}`
-         );
+    // Log for activity
+    const username = req.body.userName || "system";
+    const userdochangerole = req.body.userRole || "system";
+    await createActivityLog(
+      username,
+      userdochangerole,
+      `Updated role of: ${NOC}`
+    );
 
     res.status(200).json({
       status: "success",
@@ -142,7 +142,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating user role: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -178,7 +178,7 @@ const deleteUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting user: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 

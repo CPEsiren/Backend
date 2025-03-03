@@ -1,16 +1,16 @@
 import { sendEmail } from "../services/mailService";
 import { sendLine } from "../services/lineService";
-import Media, { IMedia } from "../models/Media";
+import Media from "../models/Media";
 import Trigger, { ITrigger } from "../models/Trigger";
 import mongoose from "mongoose";
 import {
   parseExpressionDetailed,
   parseExpressionToItems,
 } from "./parserService";
-import Host from "../models/Host";
+import Host, { IHost } from "../models/Host";
 import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
-import Item, { IItem } from "../models/Item";
+import { IItem } from "../models/Item";
 
 export async function checkCondition(
   host_id: mongoose.Types.ObjectId,
@@ -19,28 +19,27 @@ export async function checkCondition(
 ) {
   try {
     const triggers = await Trigger.find({
+      items: { $elemMatch: { $eq: [item.item_name, item._id] } },
       host_id,
       enabled: true,
-    });
-
-    triggers.map(async (trigger) => {
-      trigger.items.forEach(async (i) => {
-        if (i[0] === item.item_name && i[1] == item._id) {
-          return trigger;
-        }
-      });
     });
 
     if (!triggers || triggers.length === 0) {
       return null;
     }
-
     triggers.forEach(async (trigger) => {
       const parsedExpression = parseExpressionDetailed(trigger.expression);
 
-      trigger.items.forEach(async (i) => {
-        if (i[0] === item.item_name) {
-          i[2] = valuelasted;
+      trigger.items.findIndex(([itemName, itemId]) => {
+        if (itemName === item.item_name) {
+          trigger.valueItem[
+            trigger.items.findIndex(([itemName, itemId]) => {
+              if (itemName === item.item_name) {
+                return true;
+              }
+            })
+          ] = valuelasted;
+          return true;
         }
       });
 
@@ -78,7 +77,7 @@ export async function checkCondition(
         (pos) => trigger.logicExpression[pos]
       );
 
-      if (trigger.ok_event_generation === "recovery expression") {
+      if (trigger.ok_event_generation === "resolved expression") {
         const parsedRecoveryExpression = parseExpressionDetailed(
           trigger.recovery_expression
         );
@@ -144,7 +143,7 @@ export async function checkCondition(
           }
         );
       }
-      await sumTriggers(trigger);
+      await sumTriggers(trigger, item);
     });
   } catch (error) {
     console.error(`Error hasTrigger : `, error);
@@ -419,7 +418,7 @@ export async function calculateLogic(input: string[]): Promise<boolean> {
 
 const schedules: { [key: string]: NodeJS.Timeout } = {};
 
-async function sumTriggers(trigger: ITrigger) {
+async function sumTriggers(trigger: ITrigger, item: IItem) {
   try {
     const sumLogicExpr = await calculateLogic(trigger.logicExpression);
     const sumLogicRecoveryExpr = await calculateLogic(
@@ -430,206 +429,85 @@ async function sumTriggers(trigger: ITrigger) {
     trigger.isRecoveryExpressionValid = sumLogicRecoveryExpr;
 
     await trigger.save();
-    handleTrigger(trigger);
+    handleTrigger(trigger, item);
   } catch (error) {
     console.log(`[${new Date().toLocaleString()}] sumTriggers : ${error}`);
   }
 }
 
-async function handleTrigger(trigger: ITrigger) {
+const schedulesWaitAlert: { [key: string]: NodeJS.Timeout } = {};
+const schedulesWaitRecovery: { [key: string]: NodeJS.Timeout } = {};
+
+async function handleTrigger(trigger: ITrigger, item: IItem) {
   try {
     const host = await Host.findById(trigger.host_id);
-    const eventold = await Event.findOne({
-      trigger_id: trigger._id,
-      severity: trigger.severity,
-      status: "PROBLEM",
-    });
 
     const sumLogicExpr = trigger.isExpressionValid;
     const sumLogicRecoveryExpr = trigger.isRecoveryExpressionValid;
 
-    if (trigger.ok_event_generation === "recovery expression") {
+    if (trigger.ok_event_generation === "resolved expression") {
       if (sumLogicExpr && sumLogicRecoveryExpr) {
-        const event = await Event.findOneAndUpdate(
-          {
-            trigger_id: trigger._id,
-            severity: trigger.severity,
-            status: "PROBLEM",
-          },
-          {
-            status: "RESOLVED",
-            message: trigger.recovery_expression,
-          }
-        );
-        if (event) {
-          await sendNotification(event, trigger);
+        await recoverOrDownSeverity(trigger);
+        if (schedulesWaitAlert[trigger._id as string]) {
+          clearInterval(schedulesWaitAlert[trigger._id as string]);
+          delete schedulesWaitAlert[trigger._id as string];
         }
       } else if (sumLogicExpr && !sumLogicRecoveryExpr) {
-        const event = await Event.findOneAndUpdate(
-          {
-            trigger_id: trigger._id,
-            severity: trigger.severity,
-            status: "PROBLEM",
-          },
-          {
-            trigger_id: trigger._id,
-            type: trigger.type,
-            severity: trigger.severity,
-            hostname: host?.hostname,
-            status: "PROBLEM",
-            message: trigger.expression,
-          },
-          {
-            upsert: true,
-            new: true,
-          }
-        );
-        if (event) {
-          if (eventold?.status !== event.status) {
-            await sendNotification(event, trigger);
+        if (trigger.thresholdDuration === 0) {
+          await problemOrUpSeverity(trigger, host);
+        } else {
+          if (!schedulesWaitAlert[trigger._id as string]) {
+            schedulesWaitAlert[trigger._id as string] = setInterval(
+              async () => {
+                await problemOrUpSeverity(trigger, host);
+              },
+              trigger.thresholdDuration
+            );
           }
         }
       } else if (!sumLogicExpr && sumLogicRecoveryExpr) {
-        const event = await Event.findOneAndUpdate(
-          {
-            trigger_id: trigger._id,
-            severity: trigger.severity,
-            status: "PROBLEM",
-          },
-          {
-            status: "RESOLVED",
-            message: trigger.recovery_expression,
-          }
-        );
-        if (event) {
-          await sendNotification(event, trigger);
+        await recoverOrDownSeverity(trigger);
+        if (schedulesWaitAlert[trigger._id as string]) {
+          clearInterval(schedulesWaitAlert[trigger._id as string]);
+          delete schedulesWaitAlert[trigger._id as string];
         }
       } else if (!sumLogicExpr && !sumLogicRecoveryExpr) {
-        const event = await Event.findOneAndUpdate(
-          {
-            trigger_id: trigger._id,
-            severity: trigger.severity,
-            status: "PROBLEM",
-          },
-          {
-            status: "RESOLVED",
-            message: trigger.recovery_expression,
-          }
-        );
-        if (event) {
-          await sendNotification(event, trigger);
+        await recoverOrDownSeverity(trigger);
+        if (schedulesWaitAlert[trigger._id as string]) {
+          clearInterval(schedulesWaitAlert[trigger._id as string]);
+          delete schedulesWaitAlert[trigger._id as string];
         }
       }
     } else if (trigger.ok_event_generation === "expression") {
       if (sumLogicExpr) {
-        const dependentTriggersHigher = await findDependentTriggerHigher(
-          trigger
-        );
-
-        if (dependentTriggersHigher.length === 0) {
-          const expr = extractNonNumeric(
-            parseExpressionDetailed(trigger.expression)
-          );
-          const e = await Event.find({
-            trigger_id: {
-              $ne: trigger._id,
-            },
-            status: "PROBLEM",
-          });
-          e.filter((e) => {
-            return compareNonNumeric(parseExpressionDetailed(e.message), expr);
-          });
-          if (e.length === 0) {
-            const event = await Event.findOneAndUpdate(
-              {
-                trigger_id: trigger._id,
-                severity: trigger.severity,
-                status: "PROBLEM",
-              },
-              {
-                trigger_id: trigger._id,
-                type: trigger.type,
-                severity: trigger.severity,
-                hostname: host?.hostname,
-                status: "PROBLEM",
-                message: trigger.expression,
-              },
-              {
-                upsert: true,
-                new: true,
-              }
-            );
-            if (event) {
-              if (eventold?.status !== event.status) {
-                await sendNotification(event, trigger);
-              }
-            }
-          }
+        if (schedulesWaitRecovery[trigger._id as string]) {
+          clearInterval(schedulesWaitRecovery[trigger._id as string]);
+          delete schedulesWaitRecovery[trigger._id as string];
+        }
+        if (trigger.thresholdDuration === 0) {
+          await problemOrUpSeverity(trigger, host);
         } else {
-          if (
-            compareSeverityHigher(
-              dependentTriggersHigher[0].severity,
-              trigger.severity
-            )
-          ) {
-            const event = await Event.findOneAndUpdate(
-              {
-                trigger_id: trigger._id,
-                severity: trigger.severity,
-                status: "PROBLEM",
+          if (!schedulesWaitAlert[trigger._id as string]) {
+            schedulesWaitAlert[trigger._id as string] = setInterval(
+              async () => {
+                await problemOrUpSeverity(trigger, host);
               },
-              {
-                trigger_id: dependentTriggersHigher[0]._id,
-                severity: dependentTriggersHigher[0].severity,
-                message: dependentTriggersHigher[0].expression,
-                createdAt: new Date(),
-              }
+              trigger.thresholdDuration
             );
-            if (event) {
-              await sendNotification(event, trigger);
-            }
           }
         }
       } else {
-        const dependentTriggersLower = await findDependentTriggerLower(trigger);
-        if (dependentTriggersLower.length === 0) {
-          const event = await Event.findOneAndUpdate(
-            {
-              trigger_id: trigger._id,
-              severity: trigger.severity,
-              status: "PROBLEM",
-            },
-            {
-              status: "RESOLVED",
-            }
-          );
-          if (event) {
-            await sendNotification(event, trigger);
-          }
-        } else {
-          if (
-            compareSeverityLower(
-              dependentTriggersLower[0].severity,
-              trigger.severity
-            )
-          ) {
-            const event = await Event.findOneAndUpdate(
-              {
-                trigger_id: trigger._id,
-                severity: trigger.severity,
-                status: "PROBLEM",
-              },
-              {
-                trigger_id: dependentTriggersLower[0]._id,
-                severity: dependentTriggersLower[0].severity,
-                message: dependentTriggersLower[0].expression,
-                createdAt: new Date(),
+        if (!schedulesWaitRecovery[trigger._id as string]) {
+          schedulesWaitRecovery[trigger._id as string] = setInterval(
+            async () => {
+              await recoverOrDownSeverity(trigger);
+              if (schedulesWaitAlert[trigger._id as string]) {
+                clearInterval(schedulesWaitAlert[trigger._id as string]);
+                delete schedulesWaitAlert[trigger._id as string];
               }
-            );
-            if (event) {
-              await sendNotification(event, trigger);
-            }
-          }
+            },
+            item.interval * 1000 * 3
+          );
         }
       }
     }
@@ -638,123 +516,331 @@ async function handleTrigger(trigger: ITrigger) {
   }
 }
 
-export async function handleHasTrigger(
-  trigger: ITrigger,
-  valueAlerted: number,
-  item: IItem | null
-) {
+export async function sendNotificationDevice(title: string, message: string) {
   try {
+    const medias = await Media.find({ enabled: true });
+
+    if (!medias) {
+      console.log(
+        `[${new Date().toLocaleString()}] No medias found or disabled`
+      );
+      return;
+    }
+
+    medias.forEach(async (media) => {
+      if (media.type === "email") {
+        console.log(
+          `[${new Date().toLocaleString()}] Sending email by [${
+            media.recipient.name
+          }]`
+        );
+        await sendEmail(media.recipient.send_to, title, message);
+      } else if (media.type === "line") {
+        console.log(
+          `[${new Date().toLocaleString()}] Sending line by [${
+            media.recipient.name
+          }]`
+        );
+        await sendLine(media.recipient.send_to, title, message);
+      }
+    });
   } catch (error) {
-    console.log(`[${new Date().toLocaleString()}] handleHasTrigger : ${error}`);
-  }
-}
-export async function handleNotHasTrigger(
-  trigger: ITrigger,
-  item: IItem | null
-) {
-  if (
-    trigger.ok_event_generation === "recovery expression" &&
-    trigger.isRecoveryExpressionValid
-  ) {
-    const event = await Event.findOneAndUpdate(
-      {
-        trigger_id: trigger._id,
-        type: "item",
-        severity: trigger.severity,
-        status: "PROBLEM",
-      },
-      {
-        status: "RESOLVED",
-      },
-      { new: true }
+    console.log(
+      `[${new Date().toLocaleString()}] sendNotificationDevice : ${error}`
     );
-
-    clearInterval(schedules[event?._id as string]);
-    if (event) {
-      await sendNotification(event, trigger);
-      console.log(
-        `[${new Date().toLocaleString()}] Event resolved of trigger ${
-          trigger.trigger_name
-        } by recovery expression`
-      );
-    }
-  } else if (trigger.ok_event_generation === "expression") {
-    const event = await Event.findOneAndUpdate(
-      {
-        trigger_id: trigger._id,
-        severity: trigger.severity,
-        status: "PROBLEM",
-      },
-      {
-        status: "RESOLVED",
-      },
-      { new: true }
-    );
-
-    clearInterval(schedules[event?._id as string]);
-    if (event) {
-      console.log(
-        `[${new Date().toLocaleString()}] Event resolved of trigger ${
-          trigger.trigger_name
-        } by expression`
-      );
-      await sendNotification(event, trigger);
-    }
   }
 }
 
-export async function sendNotification(event: IEvent, trigger: ITrigger) {
-  const host = await Host.findOne({ _id: trigger.host_id });
-  const medias = await Media.find({ enabled: true });
+export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
+  try {
+    const host = await Host.findOne({ _id: trigger.host_id });
+    const medias = await Media.find({ enabled: true });
 
-  if (!medias) {
-    console.log(`[${new Date().toLocaleString()}] No medias found or disabled`);
-    return;
-  }
-
-  const replacement = {
-    //Trigger
-    "{TRIGGER.NAME}": trigger.trigger_name,
-    "{TRIGGER.EXPRESSION}": trigger.expression,
-    "{TRIGGER.RECOVERY_EXPRESSION}": trigger.recovery_expression,
-    "{TRIGGER.SEVERITY}": trigger.severity,
-    //Host
-    "{HOST.NAME}": host?.hostname ?? event.hostname,
-    "{HOST.IP}": host?.ip_address ?? "Unknown IP",
-    //Item
-    // "{ITEM.NAME}": item?.item_name ?? "Unknown Item",
-    // "{ITEM.VALUE}": event.value_alerted,
-    //Event
-    "{EVENT.STATUS}": event.status,
-    "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString(),
-    "{EVENT.RECOVERY.TIMESTAMP}": event.updatedAt.toLocaleString(),
-  };
-
-  medias.forEach(async (media) => {
-    if (media.type === "email") {
+    if (!medias) {
       console.log(
-        `[${new Date().toLocaleString()}] Sending email by [${
-          media.recipient.name
-        }]`
+        `[${new Date().toLocaleString()}] No medias found or disabled`
       );
-      // await sendEmail(
-      //   media.recipient.send_to,
-      //   media.problem_title,
-      //   media.problem_body
-      // );
-    } else if (media.type === "line") {
-      console.log(
-        `[${new Date().toLocaleString()}] Sending line by [${
-          media.recipient.name
-        }]`
-      );
-      // await sendLine(
-      //   media.recipient.send_to,
-      //   media.problem_title,
-      //   media.problem_body
-      // );
+      return;
     }
-  });
+
+    const allItemandValue = trigger.items.map((item, index) => {
+      return `${item[index]} : ${trigger.valueItem[index]}`;
+    });
+
+    const replacement: Record<string, string> = {
+      //Trigger
+      "{TRIGGER.NAME}": trigger.trigger_name,
+      "{TRIGGER.EXPRESSION}": trigger.expression,
+      "{TRIGGER.RESOLVED.EXPRESSION}":
+        trigger.recovery_expression === ""
+          ? "None"
+          : trigger.recovery_expression,
+      "{TRIGGER.SEVERITY}": trigger.severity,
+      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue.join("\n"),
+      //Host
+      "{HOST.NAME}": host?.hostname ?? event.hostname,
+      "{HOST.IP}": host?.ip_address ?? "Unknown IP",
+      //Event
+      "{EVENT.STATUS}": event.status,
+      "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString(),
+      "{EVENT.RESOLVED.TIMESTAMP}": event.resolvedAt
+        ? event.resolvedAt.toLocaleString()
+        : "",
+    };
+
+    medias.forEach(async (media) => {
+      const title = replaceAll(media.problem_title, replacement);
+      const body = replaceAll(media.problem_body, replacement);
+      if (media.type === "email") {
+        console.log(
+          `[${new Date().toLocaleString()}] ${trigger.trigger_name} ${
+            trigger.severity
+          } Sending email by [${media.recipient.name}]`
+        );
+        await sendEmail(media.recipient.send_to, title, body);
+      } else if (media.type === "line") {
+        console.log(
+          `[${new Date().toLocaleString()}] Sending line by [${
+            media.recipient.name
+          }]`
+        );
+        await sendLine(media.recipient.send_to, title, body);
+      }
+    });
+  } catch (error) {
+    console.log(`[${new Date().toLocaleString()}] sendNotification : ${error}`);
+  }
+}
+
+async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
+  try {
+    const trigger = await Trigger.findById(t._id);
+
+    if (trigger) {
+      const eventold = await Event.findOne({
+        trigger_id: trigger._id,
+        severity: trigger.severity,
+        status: "PROBLEM",
+      });
+
+      const dependentTriggersHigher = await findDependentTriggerHigher(trigger);
+      const dependentTriggersLower = await findDependentTriggerLower(trigger);
+
+      if (
+        dependentTriggersHigher.length === 0 &&
+        dependentTriggersLower.length === 0
+      ) {
+        const eventActive = await Event.find({
+          trigger_id: { $ne: trigger._id },
+          status: "PROBLEM",
+        });
+
+        if (eventActive.length !== 0) {
+          eventActive.filter(async (e) => {
+            const trig = await Trigger.findById(e.trigger_id).select(
+              "expression"
+            );
+            if (trig) {
+              return compareNonNumeric(
+                extractNonNumeric(parseExpressionDetailed(trig.expression)),
+                extractNonNumeric(parseExpressionDetailed(trigger.expression))
+              );
+            }
+          });
+        }
+
+        if (eventActive.length === 0) {
+          const event = await Event.findOneAndUpdate(
+            {
+              trigger_id: trigger._id,
+              severity: trigger.severity,
+              status: "PROBLEM",
+            },
+            {
+              trigger_id: trigger._id,
+              type: trigger.type,
+              severity: trigger.severity,
+              hostname: host?.hostname,
+              status: "PROBLEM",
+              message: trigger.expression,
+            },
+            {
+              upsert: true,
+              new: true,
+            }
+          );
+          if (!eventold) {
+            console.log("h0_1 l0_1");
+            await sendNotificationItem(event, trigger);
+          }
+        } else {
+          const event = await Event.findOneAndUpdate(
+            {
+              _id: eventActive[0]._id,
+            },
+            {
+              trigger_id: trigger._id,
+              severity: trigger.severity,
+              message: trigger.expression,
+              createdAt: new Date(),
+            }
+          );
+          if (event) {
+            console.log("h0_2 l0_2");
+            await sendNotificationItem(event, trigger);
+          }
+        }
+      } else if (
+        dependentTriggersHigher.length > 0 &&
+        dependentTriggersLower.length === 0
+      ) {
+        const event = await Event.findOneAndUpdate(
+          {
+            trigger_id: trigger._id,
+            severity: trigger.severity,
+            status: "PROBLEM",
+          },
+          {
+            trigger_id: dependentTriggersHigher[0]._id,
+            severity: dependentTriggersHigher[0].severity,
+            message: dependentTriggersHigher[0].expression,
+            createdAt: new Date(),
+          }
+        );
+        if (event) {
+          console.log("h1 l0");
+          await sendNotificationItem(event, dependentTriggersHigher[0]);
+        }
+      } else if (
+        dependentTriggersHigher.length === 0 &&
+        dependentTriggersLower.length > 0
+      ) {
+        const eventActive = await Event.find({
+          status: "PROBLEM",
+        });
+
+        if (eventActive.length !== 0) {
+          eventActive.filter(async (e) => {
+            const trig = await Trigger.findById(e.trigger_id).select(
+              "expression"
+            );
+            if (trig) {
+              return compareNonNumeric(
+                extractNonNumeric(parseExpressionDetailed(trig.expression)),
+                extractNonNumeric(parseExpressionDetailed(trigger.expression))
+              );
+            }
+          });
+        }
+
+        if (eventActive.length === 0) {
+          const event = await Event.findOneAndUpdate(
+            {
+              trigger_id: trigger._id,
+              severity: trigger.severity,
+              status: "PROBLEM",
+            },
+            {
+              trigger_id: trigger._id,
+              type: trigger.type,
+              severity: trigger.severity,
+              hostname: host?.hostname,
+              status: "PROBLEM",
+              message: trigger.expression,
+            },
+            {
+              upsert: true,
+              new: true,
+            }
+          );
+          if (!eventold) {
+            console.log("h0_1 l1_1");
+
+            await sendNotificationItem(event, trigger);
+          }
+        } else if (
+          compareSeverityHigher(eventActive[0].severity, trigger.severity)
+        ) {
+          const event = await Event.findOneAndUpdate(
+            {
+              _id: eventActive[0]._id,
+            },
+            {
+              trigger_id: trigger._id,
+              severity: trigger.severity,
+              message: trigger.expression,
+              createdAt: new Date(),
+            }
+          );
+          if (!eventold && event) {
+            console.log("h0_2 l1_2");
+            await sendNotificationItem(event, trigger);
+          }
+        }
+      } else if (
+        dependentTriggersHigher.length > 0 &&
+        dependentTriggersLower.length > 0
+      ) {
+        const event = await Event.findOneAndUpdate(
+          {
+            trigger_id: trigger._id,
+            severity: trigger.severity,
+            status: "PROBLEM",
+          },
+          {
+            trigger_id: dependentTriggersHigher[0]._id,
+            severity: dependentTriggersHigher[0].severity,
+            message: dependentTriggersHigher[0].expression,
+            createdAt: new Date(),
+          }
+        );
+        if (event) {
+          console.log("h1 l0");
+          await sendNotificationItem(event, dependentTriggersHigher[0]);
+        }
+      }
+    }
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] problemOrUpSeverity : ${error}`
+    );
+  }
+}
+
+async function recoverOrDownSeverity(trigger: ITrigger) {
+  try {
+    const dependentTriggersHigher = await findDependentTriggerHigher(trigger);
+    const dependentTriggersLower = await findDependentTriggerLower(trigger);
+    if (
+      dependentTriggersHigher.length === 0 &&
+      dependentTriggersLower.length === 0
+    ) {
+      const event = await Event.findOneAndUpdate(
+        {
+          trigger_id: trigger._id,
+          severity: trigger.severity,
+          status: "PROBLEM",
+        },
+        {
+          status: "RESOLVED",
+          resolvedAt: new Date(),
+        }
+      );
+      if (event) {
+        const eventResolved = await Event.findOne({
+          _id: event._id,
+        });
+        await sendNotificationItem(
+          eventResolved ? eventResolved : event,
+          trigger
+        );
+      }
+    }
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] recoverOrDownSeverity : ${error}`
+    );
+  }
 }
 
 function extractNonNumeric(expression: any[]): any[] {
@@ -796,95 +882,154 @@ function arraysEqual(a: any[], b: any[]): boolean {
 async function findDependentTriggerHigher(
   trigger: ITrigger
 ): Promise<ITrigger[]> {
-  const exprNonNum = extractNonNumeric(
-    parseExpressionDetailed(trigger.expression)
-  );
-
-  const Triggers = await Trigger.find({
-    _id: { $ne: trigger._id },
-    enabled: true,
-  });
-
-  const dependentTriggers: ITrigger[] = [];
-
-  Triggers.forEach(async (trig) => {
-    const trigNonNum = extractNonNumeric(
+  try {
+    const exprNonNum = extractNonNumeric(
       parseExpressionDetailed(trigger.expression)
     );
 
-    if (
-      compareNonNumeric(exprNonNum, trigNonNum) &&
-      trig.isExpressionValid &&
-      compareSeverityHigher(trig.severity, trigger.severity)
-    ) {
-      dependentTriggers.push(trig);
-    }
-  });
+    const Triggers = await Trigger.find({
+      _id: { $ne: trigger._id },
+      enabled: true,
+    });
 
-  dependentTriggers.sort((a, b) => {
-    const severityOrder = { disaster: 3, critical: 2, warning: 1 };
-    return severityOrder[b.severity] - severityOrder[a.severity];
-  });
+    const dependentTriggers: ITrigger[] = [];
 
-  return dependentTriggers;
+    Triggers.forEach(async (trig) => {
+      const trigNonNum = extractNonNumeric(
+        parseExpressionDetailed(trigger.expression)
+      );
+
+      if (trig.ok_event_generation === "expression") {
+        if (
+          compareNonNumeric(exprNonNum, trigNonNum) &&
+          trig.isExpressionValid &&
+          compareSeverityHigher(trig.severity, trigger.severity)
+        ) {
+          dependentTriggers.push(trig);
+        }
+      } else {
+        if (
+          compareNonNumeric(exprNonNum, trigNonNum) &&
+          compareSeverityHigher(trig.severity, trigger.severity)
+        ) {
+          if (trig.isExpressionValid && !trig.isRecoveryExpressionValid) {
+            dependentTriggers.push(trig);
+          }
+        }
+      }
+    });
+
+    dependentTriggers.sort((a, b) => {
+      const severityOrder = { disaster: 3, critical: 2, warning: 1 };
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    });
+
+    return dependentTriggers;
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] findDependentTriggerHigher : ${error}`
+    );
+    return [];
+  }
 }
 
 async function findDependentTriggerLower(
   trigger: ITrigger
 ): Promise<ITrigger[]> {
-  const exprNonNum = extractNonNumeric(
-    parseExpressionDetailed(trigger.expression)
-  );
-
-  const Triggers = await Trigger.find({
-    _id: { $ne: trigger._id },
-    enabled: true,
-  });
-
-  const dependentTriggers: ITrigger[] = [];
-
-  Triggers.forEach(async (trig) => {
-    const trigNonNum = extractNonNumeric(
+  try {
+    const exprNonNum = extractNonNumeric(
       parseExpressionDetailed(trigger.expression)
     );
 
-    if (
-      compareNonNumeric(exprNonNum, trigNonNum) &&
-      trig.isExpressionValid &&
-      compareSeverityLower(trig.severity, trigger.severity)
-    ) {
-      dependentTriggers.push(trig);
-    }
-  });
+    const Triggers = await Trigger.find({
+      _id: { $ne: trigger._id },
+      enabled: true,
+    });
 
-  dependentTriggers.sort((a, b) => {
-    const severityOrder = { disaster: 3, critical: 2, warning: 1 };
-    return severityOrder[b.severity] - severityOrder[a.severity];
-  });
+    const dependentTriggers: ITrigger[] = [];
 
-  return dependentTriggers;
+    Triggers.forEach(async (trig) => {
+      const trigNonNum = extractNonNumeric(
+        parseExpressionDetailed(trigger.expression)
+      );
+
+      if (trig.ok_event_generation === "expression") {
+        if (
+          compareNonNumeric(exprNonNum, trigNonNum) &&
+          trig.isExpressionValid &&
+          compareSeverityLower(trig.severity, trigger.severity)
+        ) {
+          dependentTriggers.push(trig);
+        }
+      } else {
+        if (
+          compareNonNumeric(exprNonNum, trigNonNum) &&
+          compareSeverityLower(trig.severity, trigger.severity)
+        ) {
+          if (trig.isExpressionValid && !trig.isRecoveryExpressionValid) {
+            dependentTriggers.push(trig);
+          }
+        }
+      }
+    });
+
+    dependentTriggers.sort((a, b) => {
+      const severityOrder = { disaster: 3, critical: 2, warning: 1 };
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    });
+
+    return dependentTriggers;
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] findDependentTriggerLower : ${error}`
+    );
+    return [];
+  }
 }
 
 function compareSeverityHigher(
   a: ITrigger["severity"],
   b: ITrigger["severity"]
 ): boolean {
-  const severityOrder: { [key in ITrigger["severity"]]: number } = {
-    disaster: 3,
-    critical: 2,
-    warning: 1,
-  };
-  return severityOrder[a] >= severityOrder[b];
+  try {
+    const severityOrder: { [key in ITrigger["severity"]]: number } = {
+      disaster: 3,
+      critical: 2,
+      warning: 1,
+    };
+    return severityOrder[a] > severityOrder[b];
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] compareSeverityHigher : ${error}`
+    );
+    return false;
+  }
 }
 
 function compareSeverityLower(
   a: ITrigger["severity"],
   b: ITrigger["severity"]
 ): boolean {
-  const severityOrder: { [key in ITrigger["severity"]]: number } = {
-    disaster: 3,
-    critical: 2,
-    warning: 1,
-  };
-  return severityOrder[a] < severityOrder[b];
+  try {
+    const severityOrder: { [key in ITrigger["severity"]]: number } = {
+      disaster: 3,
+      critical: 2,
+      warning: 1,
+    };
+    return severityOrder[a] < severityOrder[b];
+  } catch (error) {
+    console.log(
+      `[${new Date().toLocaleString()}] compareSeverityLower : ${error}`
+    );
+    return false;
+  }
 }
+
+const replaceAll = (
+  str: string,
+  replacements: Record<string, string>
+): string => {
+  return Object.keys(replacements).reduce((acc, key) => {
+    return acc.replace(new RegExp(key, "g"), replacements[key]);
+  }, str);
+};

@@ -5,10 +5,10 @@ export interface IEvent extends Document {
   type: "item" | "host";
   severity: "warning" | "critical" | "disaster";
   hostname: string;
-  status: "PROBLEM" | "RESOLVED";
+  status: "PROBLEM" | "RESOLVED" | "EVENT";
   message: string;
   createdAt: Date;
-  updatedAt: Date;
+  resolvedAt: Date;
 }
 
 const EventSchema: Schema<IEvent> = new mongoose.Schema(
@@ -33,12 +33,16 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["PROBLEM", "RESOLVED"],
+      enum: ["PROBLEM", "RESOLVED", "EVENT"],
     },
     message: { type: String, required: true },
+    resolvedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
-    timestamps: { createdAt: true, updatedAt: true },
+    timestamps: { createdAt: true, updatedAt: false },
   }
 );
 

@@ -8,11 +8,13 @@ export interface ITrigger extends Document {
   expression: string;
   logicExpression: string[];
   isExpressionValid: boolean;
-  items: [string, mongoose.Types.ObjectId, number][];
-  ok_event_generation: "expression" | "recovery expression" | "none";
+  items: [string, mongoose.Types.ObjectId][];
+  valueItem: number[];
+  ok_event_generation: "expression" | "resolved expression" | "none";
   recovery_expression: string;
   logicRecoveryExpression: string[];
   isRecoveryExpressionValid: boolean;
+  thresholdDuration: number;
   enabled: boolean;
   createdAt: Date;
   expressionPart: {
@@ -68,12 +70,16 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
       default: false,
     },
     items: {
-      type: [[String, Schema.Types.ObjectId, Number]],
+      type: [[String, Schema.Types.ObjectId]],
+      default: [],
+    },
+    valueItem: {
+      type: [Number],
       default: [],
     },
     ok_event_generation: {
       type: String,
-      enum: ["expression", "recovery expression", "none"],
+      enum: ["expression", "resolved expression", "none"],
       required: true,
     },
     recovery_expression: {
@@ -86,6 +92,10 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
     isRecoveryExpressionValid: {
       type: Boolean,
       default: true,
+    },
+    thresholdDuration: {
+      type: Number,
+      default: 0,
     },
     enabled: {
       type: Boolean,
@@ -121,6 +131,15 @@ const TriggerSchema: Schema<ITrigger> = new Schema(
   {
     timestamps: { createdAt: true, updatedAt: false },
   }
+);
+
+TriggerSchema.index(
+  {
+    trigger_name: 1,
+    severity: 1,
+    host_id: 1,
+  },
+  { unique: true }
 );
 
 export default mongoose.model<ITrigger>("Trigger", TriggerSchema);

@@ -21,7 +21,7 @@ export const getAllTemplate = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("Error fetching templates:", err);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: err });
   }
 };
 
@@ -65,7 +65,7 @@ export const createTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error creating template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -80,6 +80,14 @@ export const updateTemplate = async (req: Request, res: Response) => {
         message: "Invalid template ID format.",
       });
     }
+
+     const originalTemplate: any = await Template.findById(template_id).lean();
+        if (!originalTemplate) {
+          return res.status(404).json({
+            status: "fail",
+            message: `No template found with ID: ${template_id}`,
+          });
+        }
 
     const updateFields = ["template_name", "items", "description", "triggers"];
     const updateData: { [key: string]: any } = {};
@@ -110,13 +118,27 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
+    const changes = Object.keys(updateData)
+    .filter(
+      (key) =>
+        JSON.stringify(updateData[key]) !==
+        JSON.stringify(originalTemplate[key as keyof typeof originalTemplate])
+    )
+    .map(
+      (key) =>
+        `${key}: ${JSON.stringify(
+          originalTemplate[key as keyof typeof originalTemplate]
+        )} → ${JSON.stringify(updateData[key])}`
+    )
+    .join(", ");
+
     // Log for activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
     await createActivityLog(
       username,
       role,
-      `Updated template: ${template_name}`
+      `Updated host: ${updatedTemplate.template_name}. Changes: ${changes}`
     );
 
     res.status(200).json({
@@ -126,7 +148,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error updating template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -167,6 +189,6 @@ export const deleteTemplate = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error deleting template: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };

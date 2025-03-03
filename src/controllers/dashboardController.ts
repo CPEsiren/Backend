@@ -21,6 +21,7 @@ export async function getDashboardCounts(req: Request, res: Response) {
       triggerDisabledCount,
       userOnlineCount,
       problemEventCount,
+      resolvedEventCount,
     ] = await Promise.all([
       Host.countDocuments(),
       Item.countDocuments(),
@@ -33,6 +34,7 @@ export async function getDashboardCounts(req: Request, res: Response) {
       Trigger.countDocuments({ enabled: false }),
       User.countDocuments({ isActive: true }),
       Event.countDocuments({ status: "PROBLEM" }),
+      Event.countDocuments({ status: "RESOLVED" }),
     ]);
 
     const counts = {
@@ -59,7 +61,8 @@ export async function getDashboardCounts(req: Request, res: Response) {
       events: {
         total: eventCount,
         problem: problemEventCount,
-        resolved: eventCount - problemEventCount,
+        resolved: resolvedEventCount,
+        event: eventCount - problemEventCount - resolvedEventCount,
       },
       templates: {
         total: templateCount,
@@ -68,7 +71,9 @@ export async function getDashboardCounts(req: Request, res: Response) {
 
     res.status(200).json(counts);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch dashboard counts" });
+    res
+      .status(500)
+      .json({ error: `Failed to fetch dashboard counts : ${error}` });
   }
 }
 
@@ -85,7 +90,7 @@ export async function getDashboards(req: Request, res: Response) {
     res.status(200).json({ status: "success", dashboards });
   } catch (error) {
     console.error("Error fetching dashboards:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }
 
@@ -104,7 +109,7 @@ export async function getDashboardsUser(req: Request, res: Response) {
     res.status(200).json({ status: "success", dashboards });
   } catch (error) {
     console.error("Failed to fetch user dashboards:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }
 
@@ -123,7 +128,7 @@ export async function getDashboardsViewer(req: Request, res: Response) {
   } catch (error) {
     console.error("Failed to fetch viewer dashboards:", error);
 
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }
 
@@ -152,7 +157,7 @@ export async function createDashboard(req: Request, res: Response) {
     res.status(201).json({ status: "success", savedDashboard });
   } catch (error) {
     console.error("Failed to create dashboard:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }
 
@@ -181,7 +186,7 @@ export async function updateDashboard(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("Failed to update dashboard:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }
 
@@ -205,6 +210,6 @@ export async function deleteDashboard(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("Failed to delete dashboard:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 }

@@ -26,7 +26,7 @@ export const getAllItem = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching item.:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -102,7 +102,7 @@ export const createItem = async (req: Request, res: Response) => {
       unit: req.body.unit,
     });
     console.error("Error creating item: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -159,13 +159,11 @@ export const deleteItem = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error("Error fetching data between times:", error);
-      res
-        .status(500)
-        .json({ status: "fail", message: "Internal server error" });
+      res.status(500).json({ status: "fail", message: error });
     }
   } catch (error) {
     console.error("Error delete item: ", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -177,6 +175,14 @@ export const updateItem = async (req: Request, res: Response) => {
       return res.status(400).json({
         status: "fail",
         message: "Invalid item ID format.",
+      });
+    }
+    // Get the original host data for logging purposes
+    const originalItem: any = await Host.findById(item_id).lean();
+    if (!originalItem) {
+      return res.status(404).json({
+        status: "fail",
+        message: `No item found with ID: ${item_id}`,
       });
     }
 
@@ -229,10 +235,29 @@ export const updateItem = async (req: Request, res: Response) => {
 
     await scheduleItem(updatedItem);
 
+    // Generate the change summary for logging
+    const changes = Object.keys(updateData)
+      .filter(
+        (key) =>
+          JSON.stringify(updateData[key]) !==
+          JSON.stringify(originalItem[key as keyof typeof originalItem])
+      )
+      .map(
+        (key) =>
+          `${key}: ${JSON.stringify(
+            originalItem[key as keyof typeof originalItem]
+          )} → ${JSON.stringify(updateData[key])}`
+      )
+      .join(", ");
+
     // Log activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Updated item:${item_id}`);
+    await createActivityLog(
+      username,
+      role,
+      `Updated host: ${updatedItem.item_name}. Changes: ${changes}`
+    );
 
     res.status(200).json({
       status: "success",
@@ -243,7 +268,7 @@ export const updateItem = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to update item:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
 
@@ -291,6 +316,6 @@ export const scanInterface = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Failed to scan interfaces:", error);
-    res.status(500).json({ status: "fail", message: "Internal server error" });
+    res.status(500).json({ status: "fail", message: error });
   }
 };
