@@ -98,7 +98,6 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               ? 0
               : latestData.current_value[0];
             const previousTimestamp = new Date(latestData.timestamp as Date);
-            console.log(previousValue, "  ", currentValue);
 
             if (currentValue < previousValue) {
               deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue;
@@ -110,6 +109,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               (currentTimestamp.getTime() - previousTimestamp.getTime()) / 1000;
 
             changePerSecond = deltaValue / timeDifferenceInSeconds;
+            console.log(changePerSecond);
 
             value = changePerSecond;
 
