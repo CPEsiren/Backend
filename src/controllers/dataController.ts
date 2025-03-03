@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import Data from "../models/Data";
 import mongoose from "mongoose";
-import { isMoreThanSevenDays } from "../middleware/Time";
+import { isMoreThanOneDays } from "../middleware/Time";
 import Trend from "../models/Trend";
 
 export const getAllData = async (req: Request, res: Response) => {
@@ -87,7 +87,7 @@ export const getHostBetween = async (req: Request, res: Response) => {
 
     let data;
 
-    if (isMoreThanSevenDays(start, end)) {
+    if (isMoreThanOneDays(start, end)) {
       data = await Trend.aggregate([
         {
           $match: {
