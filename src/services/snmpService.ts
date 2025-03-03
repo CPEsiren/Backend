@@ -75,9 +75,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         session.close();
 
         // Get the current value
-        const currentValue = parseFloat(
-          result.value.toString() ? result.value.toString() : 0
-        );
+        const currentValue = parseFloat(result.value ? result.value : 0);
         const currentTimestamp = new Date();
 
         let value: number = 0;
