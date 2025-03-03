@@ -56,7 +56,17 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               resolve(varbinds[0]);
             }
           });
+        }).catch((error) => {
+          if (error instanceof snmp.RequestTimedOutError) {
+            console.log(`SNMP request timed out for item: ${item.item_name}`);
+            session.close();
+            return;
+          }
         });
+
+        if (!result) {
+          return;
+        }
 
         // Process the result
         if (snmp.isVarbindError(result)) {
