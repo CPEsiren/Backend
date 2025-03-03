@@ -75,8 +75,9 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
         }
 
         // Get the current value
-        const currentValue = parseFloat(
-          result.value.toString() ? result.value : 0
+        const currentValue: number[] = [];
+        currentValue.push(
+          parseFloat(result.value.toString() ? result.value : 0)
         );
         const currentTimestamp = new Date();
 
@@ -97,10 +98,10 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
               : latestData.current_value[0];
             const previousTimestamp = new Date(latestData.timestamp as Date);
 
-            if (currentValue < previousValue) {
-              deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue;
+            if (currentValue[0] < previousValue) {
+              deltaValue = MAX_COUNTER_VALUE - previousValue + currentValue[0];
             } else {
-              deltaValue = currentValue - previousValue;
+              deltaValue = currentValue[0] - previousValue;
             }
 
             const timeDifferenceInSeconds =
@@ -195,7 +196,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           item.type.toLocaleLowerCase() === "integer" &&
           !item.isBandwidth
         ) {
-          value = currentValue;
+          value = currentValue[0];
         }
 
         // Create a new Data document
@@ -207,7 +208,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           },
           timestamp: currentTimestamp,
           value: value,
-          current_value: [currentValue],
+          current_value: currentValue,
         });
 
         // Save the data to the database
