@@ -64,6 +64,10 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
           }
         });
 
+        if (!result) {
+          return;
+        }
+
         // Process the result
         if (snmp.isVarbindError(result)) {
           session.close();
@@ -72,13 +76,9 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         // Get the current value
         const currentValue: number[] = [];
-        result.reduce((total: number[], varbind: any) => {
-          if (!snmp.isVarbindError(varbind)) {
-            currentValue.push(parseFloat(varbind.value.toString()));
-          }
-          return total;
-        });
-
+        currentValue.push(
+          parseFloat(result.value.toString() ? result.value : 0)
+        );
         const currentTimestamp = new Date();
 
         let value: number = 0;
