@@ -389,7 +389,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                   const new_admin = iface.interface_Adminstatus;
                   const new_oper = iface.interface_Operstatus;
 
-                  if (old_admin !== new_admin) {
+                  if (String(old_admin) !== String(new_admin)) {
                     const message = `Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
                     await Event.create({
                       type: "host",
@@ -400,10 +400,10 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     });
 
                     await sendNotificationDevice(
-                      `Interface ${iface.interface_name} Administator status changed.`,
+                      `[${host.hostname}] Interface ${iface.interface_name} Administator status changed.`,
                       message
                     );
-                  } else if (old_oper !== new_oper) {
+                  } else if (String(old_oper) !== String(new_oper)) {
                     const message = `Interface ${iface.interface_name} Operational Status changed from ${old_admin} --> ${new_admin}`;
                     await Event.create({
                       type: "host",
