@@ -346,21 +346,6 @@ const updateTrigger = async (req: Request, res: Response) => {
           items.push([itemName, item._id]);
           valueItem.push(0);
           addedItemNames.add(itemName);
-        } else {
-          if (
-            !(
-              itemName.includes("Device Status") ||
-              itemName.includes("Interface Operation Status") ||
-              itemName.includes("Interface Admin Status")
-            )
-          ) {
-            return res.status(400).json({
-              status: "fail",
-              message: `Item [${itemName}] not found`,
-            });
-          } else {
-            type = "host";
-          }
         }
       }
     }
@@ -388,20 +373,30 @@ const updateTrigger = async (req: Request, res: Response) => {
       runValidators: true,
     });
 
+    const keycheck = {
+      trigger_name,
+      thresholdDuration,
+      severity,
+      expression,
+      ok_event_generation,
+      recovery_expression,
+      enabled,
+    };
+
     // Generate the change summary for logging
-    const changes = Object.keys(updateData)
+    const changes = Object.keys(keycheck)
       .filter(
         (key) =>
-          JSON.stringify(updateData[key as keyof typeof updateData]) !==
+          JSON.stringify(keycheck[key as keyof typeof keycheck]) !==
           JSON.stringify(originalTrigger[key as keyof typeof originalTrigger])
       )
       .map(
         (key) =>
           `${key}: ${JSON.stringify(
             originalTrigger[key as keyof typeof originalTrigger]
-          )} → ${JSON.stringify(updateData[key as keyof typeof updateData])}`
+          )} → ${JSON.stringify(keycheck[key as keyof typeof keycheck])}`
       )
-      .join(", ");
+      .join("\n");
 
     // Log activity with detailed changes
     const username = req.body.userName || "system";

@@ -7,6 +7,7 @@ import Data from "../models/Data";
 import mongoose from "mongoose";
 import Trend from "../models/Trend";
 import { createActivityLog } from "./LogUserController";
+import Trigger from "../models/Trigger";
 
 export const getAllItem = async (req: Request, res: Response) => {
   try {
@@ -86,7 +87,11 @@ export const createItem = async (req: Request, res: Response) => {
     // Log activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
-    await createActivityLog(username, role, `Created item:${item_name}`);
+    await createActivityLog(
+      username,
+      role,
+      `Created item:${item_name} of [${updatedHost.hostname}]`
+    );
 
     res.status(201).json({
       status: "success",
@@ -119,6 +124,21 @@ export const deleteItem = async (req: Request, res: Response) => {
     }
 
     try {
+      const item = await Item.findById(item_id);
+      const trigger = await Trigger.find({
+        items: {
+          $elemMatch: { $eq: [item?.item_name, item?._id] },
+        },
+      });
+
+      if (trigger.length > 0) {
+        const trigger_name = trigger.map((trigger) => trigger.trigger_name);
+        return res.status(400).json({
+          status: "fail",
+          message: `Item [${item?.item_name}] is used in trigger [${trigger_name}]`,
+        });
+      }
+
       const deletedItem = await Item.findByIdAndDelete(item_id);
 
       if (!deletedItem) {
@@ -132,6 +152,8 @@ export const deleteItem = async (req: Request, res: Response) => {
         { _id: deletedItem.host_id },
         { $pull: { items: item_id } }
       );
+
+      console.log(deletedItem);
 
       await Promise.all([
         Data.deleteMany({

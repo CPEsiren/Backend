@@ -361,7 +361,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
       return;
     }
 
-    const interfaces = host.interfaces;
+    let interfaces = host.interfaces;
 
     if (host.status === 1) {
       const session = await createSessionSNMP(
@@ -372,63 +372,86 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
         host.authenV3
       );
 
-      await Promise.all(
-        interfaces.map(async (iface) => {
-          const oid_admin = `1.3.6.1.2.1.2.2.1.7.${iface.interface_index}`;
-          const oid_oper = `1.3.6.1.2.1.2.2.1.8.${iface.interface_index}`;
-          const old_admin = iface.interface_Adminstatus;
-          const old_oper = iface.interface_Operstatus;
+      const oid = "1.3.6.1.2.1.2.2";
+      const columns = [1, 2, 3, 4, 5, 7, 8];
 
-          return new Promise<void>((resolve) => {
-            session.get(
-              [oid_admin, oid_oper],
-              async (error: any, varbinds: any) => {
-                if (error || snmp.isVarbindError(varbinds[0])) {
-                  resolve();
-                } else {
-                  iface.interface_Adminstatus =
-                    statusInterface[varbinds[0].value];
-                  iface.interface_Operstatus =
-                    statusInterface[varbinds[1].value];
-                  const new_admin = iface.interface_Adminstatus;
-                  const new_oper = iface.interface_Operstatus;
+      const table: snmp.TableEntry[] = await new Promise((resolve, reject) => {
+        session.tableColumns(oid, columns, 20, (error: any, table: any) => {
+          if (error) reject(error);
+          else resolve(table);
+        });
+      });
 
-                  if (!String(old_admin).includes(String(new_admin))) {
-                    const message = `[${host.hostname}] Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
-                    await Event.create({
-                      type: "host",
-                      severity: "warning",
-                      hostname: host.hostname,
-                      status: "EVENT",
-                      message,
-                    });
+      if (Object.entries(table).length === interfaces.length) {
+        await Promise.all(
+          interfaces.map(async (iface) => {
+            const oid_admin = `1.3.6.1.2.1.2.2.1.7.${iface.interface_index}`;
+            const oid_oper = `1.3.6.1.2.1.2.2.1.8.${iface.interface_index}`;
+            const old_admin = iface.interface_Adminstatus;
+            const old_oper = iface.interface_Operstatus;
 
-                    await sendNotificationDevice(
-                      `[${host.hostname}] Interface ${iface.interface_name} Administator status changed.`,
-                      message
-                    );
-                  } else if (!String(old_oper).includes(String(new_oper))) {
-                    const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_oper} --> ${new_oper}`;
-                    await Event.create({
-                      type: "host",
-                      severity: "warning",
-                      hostname: host.hostname,
-                      status: "EVENT",
-                      message,
-                    });
+            return new Promise<void>((resolve) => {
+              session.get(
+                [oid_admin, oid_oper],
+                async (error: any, varbinds: any) => {
+                  if (error || snmp.isVarbindError(varbinds[0])) {
+                    resolve();
+                  } else {
+                    iface.interface_Adminstatus =
+                      statusInterface[varbinds[0].value];
+                    iface.interface_Operstatus =
+                      statusInterface[varbinds[1].value];
+                    const new_admin = iface.interface_Adminstatus;
+                    const new_oper = iface.interface_Operstatus;
 
-                    await sendNotificationDevice(
-                      `[${host.hostname}] Interface ${iface.interface_name} status changed.`,
-                      message
-                    );
+                    if (!String(old_admin).includes(String(new_admin))) {
+                      const message = `[${host.hostname}] Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
+                      await Event.create({
+                        type: "host",
+                        severity: "warning",
+                        hostname: host.hostname,
+                        status: "EVENT",
+                        message,
+                      });
+
+                      await sendNotificationDevice(
+                        `[${host.hostname}] Interface ${iface.interface_name} Administator status changed.`,
+                        message
+                      );
+                    } else if (!String(old_oper).includes(String(new_oper))) {
+                      const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_oper} --> ${new_oper}`;
+                      await Event.create({
+                        type: "host",
+                        severity: "warning",
+                        hostname: host.hostname,
+                        status: "EVENT",
+                        message,
+                      });
+
+                      await sendNotificationDevice(
+                        `[${host.hostname}] Interface ${iface.interface_name} status changed.`,
+                        message
+                      );
+                    }
+                    resolve();
                   }
-                  resolve();
                 }
-              }
-            );
-          });
-        })
-      );
+              );
+            });
+          })
+        );
+      } else {
+        interfaces = Object.entries(table).map(([index, row]) => ({
+          interface_index: row[1] as number,
+          interface_name:
+            (row[2].toString().replace(/\0/g, "").trim() as string) ||
+            (`Interface ${index}` as string),
+          interface_type: IANAifType[row[3].toString()] as string,
+          interface_speed: row[5].toString() as string,
+          interface_Adminstatus: statusInterface[row[7]] as string,
+          interface_Operstatus: statusInterface[row[8]] as string,
+        }));
+      }
 
       host.interfaces = interfaces;
       await host.save();

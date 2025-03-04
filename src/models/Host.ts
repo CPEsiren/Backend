@@ -13,16 +13,14 @@ export interface IHost extends Document {
   items: mongoose.Types.ObjectId[];
   createAt: Date;
   updateAt: Date;
-  interfaces: [
-    {
-      interface_index: number;
-      interface_name: string;
-      interface_type: string;
-      interface_speed: string;
-      interface_Adminstatus: string;
-      interface_Operstatus: string;
-    }
-  ];
+  interfaces: {
+    interface_index: number;
+    interface_name: string;
+    interface_type: string;
+    interface_speed: string;
+    interface_Adminstatus: string;
+    interface_Operstatus: string;
+  }[];
   authenV3: IauthenV3;
 }
 

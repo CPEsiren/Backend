@@ -43,7 +43,7 @@ async function scheduleHost(host: any) {
     } catch (error) {
       console.error(`Error fetching data for host ${host._id}:`, error);
     }
-  }, 10 * 1000);
+  }, 60 * 1000);
 }
 
 export async function scheduleItem(item: any) {

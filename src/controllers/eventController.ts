@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import Event from "../models/Event";
+import Event, { IEvent } from "../models/Event";
 
 const getEvent = async (req: Request, res: Response) => {
   try {
@@ -18,7 +18,18 @@ const getEvent = async (req: Request, res: Response) => {
 
 const getEvents = async (req: Request, res: Response) => {
   try {
-    const events = await Event.find().lean().exec();
+    const events = await Event.find().sort({ createdAt: -1 }).lean().exec();
+
+    const eventproblems: any[] = [];
+    const evetohter: any[] = [];
+
+    events.map((event) => {
+      if (event.status === "PROBLEM") {
+        eventproblems.push(event);
+      } else {
+        evetohter.push(event);
+      }
+    });
 
     if (!events.length) {
       return res.status(404).json({
@@ -30,7 +41,7 @@ const getEvents = async (req: Request, res: Response) => {
     res.status(200).json({
       status: "success",
       message: "Events retrieved successfully",
-      data: events,
+      data: [...eventproblems, ...evetohter],
     });
   } catch (error) {
     console.error("Failed to retrieve events:", error);

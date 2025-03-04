@@ -6,7 +6,7 @@ import LogUser from "../models/LogUser";
 // Get all logs
 export const getLogUser = async (req: Request, res: Response) => {
   try {
-    const logs = await LogUser.find({});
+    const logs = await LogUser.find().sort({ createdAt: -1 }).lean().exec();
 
     if (logs.length === 0) {
       return res.status(404).json({ message: "No logs found" });
