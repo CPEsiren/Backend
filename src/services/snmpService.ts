@@ -125,7 +125,11 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
               const up = deltaValue * 8 * 100;
               const down =
-                timeDifferenceInSeconds * parseInt(ifspeed.interface_speed);
+                timeDifferenceInSeconds *
+                (parseInt(ifspeed.interface_speed) === 100 ||
+                parseInt(ifspeed.interface_speed) === 1000
+                  ? 1000000000
+                  : parseInt(ifspeed.interface_speed));
               const bandwidthUtilization = up / down;
 
               let itembandwidth: IItem | null = await Item.findOne({
