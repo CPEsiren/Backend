@@ -129,7 +129,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
             originalTemplate[key as keyof typeof originalTemplate]
           )} → ${JSON.stringify(updateData[key])}`
       )
-      .join(", ");
+      .join("\n");
 
     // Log for activity
     const username = req.body.userName || "system";
@@ -137,7 +137,7 @@ export const updateTemplate = async (req: Request, res: Response) => {
     await createActivityLog(
       username,
       role,
-      `Updated host: ${updatedTemplate.template_name}. Changes: ${changes}`
+      `Updated host: ${updatedTemplate.template_name}. Changes:\n${changes}`
     );
 
     res.status(200).json({
