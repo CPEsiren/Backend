@@ -200,7 +200,7 @@ export const updateItem = async (req: Request, res: Response) => {
       });
     }
     // Get the original host data for logging purposes
-    const originalItem: any = await Host.findById(item_id).lean();
+    const originalItem: any = await Item.findById(item_id).lean();
     if (!originalItem) {
       return res.status(404).json({
         status: "fail",
