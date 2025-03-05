@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   cpe-siren:
+    container_name: siren-backend
     build: .
     ports:
       - 5001:3000
@@ -9,6 +10,7 @@ services:
 
   mongodb:
     image: mongo:latest
+    container_name: siren-mongo
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=cp3$!r3n
