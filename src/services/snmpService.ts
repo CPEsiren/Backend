@@ -409,7 +409,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                     const new_oper = iface.interface_Operstatus;
 
                     if (!String(old_admin).includes(String(new_admin))) {
-                      const message = `[${host.hostname}] Interface ${iface.interface_name} Admin Status changed from ${old_admin} --> ${new_admin}`;
+                      const message = `[${host.hostname}] Interface ${iface.interface_name} Administator Status changed.`;
                       await Event.create({
                         type: "host",
                         severity: "warning",
@@ -419,11 +419,12 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                       });
 
                       await sendNotificationDevice(
-                        `[${host.hostname}] Interface ${iface.interface_name} Administator status changed.`,
-                        message
+                        `[${host.hostname}] Interface Administator status changed.`,
+                        message,
+                        `${old_admin} --> ${new_admin}`
                       );
                     } else if (!String(old_oper).includes(String(new_oper))) {
-                      const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed from ${old_oper} --> ${new_oper}`;
+                      const message = `[${host.hostname}] Interface ${iface.interface_name} Operational Status changed.`;
                       await Event.create({
                         type: "host",
                         severity: "warning",
@@ -433,8 +434,9 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                       });
 
                       await sendNotificationDevice(
-                        `[${host.hostname}] Interface ${iface.interface_name} status changed.`,
-                        message
+                        `[${host.hostname}] Interface Operational status changed.`,
+                        message,
+                        `${old_oper} --> ${new_oper}`
                       );
                     }
                     resolve();
@@ -526,7 +528,8 @@ export async function checkSnmpConnection(host_id: string) {
         if (!eventold) {
           await sendNotificationDevice(
             `${host.hostname} [${host.ip_address}] Status`,
-            message
+            message,
+            "DOWN"
           );
         }
       } else {
@@ -560,7 +563,8 @@ export async function checkSnmpConnection(host_id: string) {
         if (event) {
           await sendNotificationDevice(
             `${host.hostname} [${host.ip_address}] Status`,
-            message
+            message,
+            "UP"
           );
         }
       }

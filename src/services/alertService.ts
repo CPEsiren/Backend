@@ -521,7 +521,11 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
   }
 }
 
-export async function sendNotificationDevice(title: string, message: string) {
+export async function sendNotificationDevice(
+  title: string,
+  message: string,
+  datachenge: string
+) {
   try {
     const medias = await Media.find({ enabled: true });
 
@@ -539,7 +543,87 @@ export async function sendNotificationDevice(title: string, message: string) {
             media.recipient.name
           }]`
         );
-        await sendEmail(media.recipient.send_to, title, message);
+
+        let colorTitle = "#007bff";
+        let colorBGbody = "#f4f4f4";
+
+        const htmlBody = `
+    <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+          text-align: center;
+        }
+        .email-container {
+            max-width: 600px;
+            background-color: #ffffff;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .alert-box {
+            background-color: ${colorTitle};
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        .content {
+            text-align: left;
+            margin: 20px 0;
+            background-color: ${colorBGbody};
+            border-left: 7px solid ${colorTitle};
+            padding: 10px;
+            margin-bottom: 10px;
+            padding-left: 25px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .footer {
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="alert-box">
+        ${title}
+        </div>
+        <div class="content">
+            <p>${message.replace(/\n/g, "<br>")}</p>
+            <h1>${datachenge}</h1>
+        </div>
+        <div class="footer">
+            <p>Powered by CPE Siren</p>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+        await sendEmail(media.recipient.send_to, title, htmlBody);
       } else if (media.type === "line") {
         console.log(
           `[${new Date().toLocaleString()}] Sending line by [${
@@ -569,7 +653,7 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
     }
 
     const allItemandValue = trigger.items.map((item, index) => {
-      return `${item[index]} : ${trigger.valueItem[index]}`;
+      return `${trigger.expressionPart[index].functionofItem} ${item[0]} in ${trigger.expressionPart[index].duration} : ${trigger.valueItem[index]}`;
     });
 
     const replacement: Record<string, string> = {
@@ -577,7 +661,8 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       "{TRIGGER.NAME}": trigger.trigger_name,
       "{TRIGGER.EXPRESSION}": trigger.expression,
       "{TRIGGER.RESOLVED.EXPRESSION}":
-        trigger.recovery_expression === ""
+        trigger.recovery_expression === "" ||
+        trigger.recovery_expression === "(,)"
           ? "None"
           : trigger.recovery_expression,
       "{TRIGGER.SEVERITY}": trigger.severity,
@@ -607,23 +692,104 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
         : "",
     };
 
+    let colorTitle = "#007bff";
+    let colorBGbody = "#f4f4f4";
+
     medias.forEach(async (media) => {
       let title = "";
       let body = "";
       if (event.status === "RESOLVED") {
         title = replaceAll(media.recovery_title, replacement);
         body = replaceAll(media.recovery_body, replacement);
+        colorTitle = "#28a745";
+        colorBGbody = "#e8f5e9";
       } else {
         title = replaceAll(media.problem_title, replacement);
         body = replaceAll(media.problem_body, replacement);
+        colorTitle = "#d32f2f";
+        colorBGbody = "#fff5f8";
       }
+
+      const htmlBody = `
+    <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            background-color: #ffffff;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .alert-box {
+            background-color: ${colorTitle};
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        .content {
+            text-align: left;
+            margin: 20px 0;
+            background-color: ${colorBGbody};
+            border-left: 7px solid ${colorTitle};
+            padding: 10px;
+            margin-bottom: 10px;
+            padding-left: 25px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .footer {
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="alert-box">
+        ${title}
+        </div>
+        <div class="content">
+            <p>${body.replace(/\n/g, "<br>")}</p>
+        </div>
+        <div class="footer">
+            <p>Powered by CPE Siren</p>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+
       if (media.type === "email") {
         console.log(
           `[${new Date().toLocaleString()}] ${trigger.trigger_name} ${
             trigger.severity
           } Sending email by [${media.recipient.name}]`
         );
-        await sendEmail(media.recipient.send_to, title, body);
+        await sendEmail(media.recipient.send_to, title, htmlBody);
       } else if (media.type === "line") {
         console.log(
           `[${new Date().toLocaleString()}] Sending line by [${
