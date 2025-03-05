@@ -415,7 +415,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                         severity: "warning",
                         hostname: host.hostname,
                         status: "EVENT",
-                        message,
+                        message: `${message} ${old_admin} --> ${new_admin}`,
                       });
 
                       await sendNotificationDevice(
@@ -430,7 +430,7 @@ export async function checkInterfaceStatus(host_id: string): Promise<void> {
                         severity: "warning",
                         hostname: host.hostname,
                         status: "EVENT",
-                        message,
+                        message: `${message} ${old_oper} --> ${new_oper}`,
                       });
 
                       await sendNotificationDevice(
