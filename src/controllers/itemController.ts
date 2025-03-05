@@ -153,8 +153,6 @@ export const deleteItem = async (req: Request, res: Response) => {
         { $pull: { items: item_id } }
       );
 
-      console.log(deletedItem);
-
       await Promise.all([
         Data.deleteMany({
           "metadata.item_id": new mongoose.Types.ObjectId(item_id),
@@ -173,7 +171,11 @@ export const deleteItem = async (req: Request, res: Response) => {
       // Log activity
       const username = req.body.userName || "system";
       const role = req.body.userRole || "system";
-      await createActivityLog(username, role, `Deleted item:${item_name}`);
+      await createActivityLog(
+        username,
+        role,
+        `Deleted item:${deletedItem.item_name}`
+      );
 
       res.status(200).json({
         status: "success",
