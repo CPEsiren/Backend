@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-interface ITemplate {
+export interface ITemplate {
   template_name: string;
   items: {
     item_name: string;
@@ -57,6 +57,7 @@ const templateSchema = new mongoose.Schema({
         enum: ["expression", "resolved expression", "none"],
       },
       recovery_expression: { type: String },
+      thresholdDuration: { type: Number },
       expressionPart: [
         {
           item: { type: String },
