@@ -608,8 +608,15 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
     };
 
     medias.forEach(async (media) => {
-      const title = replaceAll(media.problem_title, replacement);
-      const body = replaceAll(media.problem_body, replacement);
+      let title = "";
+      let body = "";
+      if (event.status === "RESOLVED") {
+        title = replaceAll(media.recovery_title, replacement);
+        body = replaceAll(media.recovery_body, replacement);
+      } else {
+        title = replaceAll(media.problem_title, replacement);
+        body = replaceAll(media.problem_body, replacement);
+      }
       if (media.type === "email") {
         console.log(
           `[${new Date().toLocaleString()}] ${trigger.trigger_name} ${
