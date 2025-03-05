@@ -500,16 +500,15 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
           }
         }
       } else {
+        if (schedulesWaitAlert[trigger._id as string]) {
+          clearInterval(schedulesWaitAlert[trigger._id as string]);
+          delete schedulesWaitAlert[trigger._id as string];
+        }
+
         if (!schedulesWaitRecovery[trigger._id as string]) {
           schedulesWaitRecovery[trigger._id as string] = setInterval(
             async () => {
               await recoverOrDownSeverity(trigger);
-              if (schedulesWaitAlert[trigger._id as string]) {
-                clearInterval(schedulesWaitAlert[trigger._id as string]);
-                delete schedulesWaitAlert[trigger._id as string];
-              }
-              clearInterval(schedulesWaitRecovery[trigger._id as string]);
-              delete schedulesWaitRecovery[trigger._id as string];
             },
             item.interval * 1000 * 3
           );
