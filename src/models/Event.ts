@@ -43,6 +43,7 @@ const EventSchema: Schema<IEvent> = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
+    expireAfterSeconds: 2628000,
   }
 );
 

@@ -18,7 +18,7 @@ const LogUserSchema: Schema = new Schema(
   },
   {
     timestamps: { createdAt: true },
-    expireAfterSeconds: 604800,
+    expireAfterSeconds: 2628000,
   }
 );
 
