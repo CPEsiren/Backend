@@ -30,21 +30,6 @@ export async function checkCondition(
     triggers.forEach(async (trigger) => {
       const parsedExpression = parseExpressionDetailed(trigger.expression);
 
-      trigger.items.findIndex(([itemName, itemId]) => {
-        if (itemName === item.item_name) {
-          trigger.valueItem[
-            trigger.items.findIndex(([itemName, itemId]) => {
-              if (itemName === item.item_name) {
-                return true;
-              }
-            })
-          ] = valuelasted;
-          return true;
-        }
-      });
-
-      await trigger.save();
-
       // Find all positions of item_name in the parsed expression
       const itemPositions = parsedExpression.reduce(
         (positions, group, index) => {
@@ -62,6 +47,7 @@ export async function checkCondition(
 
       for (const itemPosition of itemPositions) {
         const isTriggered = await evaluateLogic(
+          trigger,
           parsedExpression,
           itemPosition,
           item,
@@ -98,6 +84,7 @@ export async function checkCondition(
 
         for (const itemPosition of recoveryItemPositions) {
           const isTriggered = await evaluateLogic(
+            trigger,
             parsedRecoveryExpression,
             itemPosition,
             item,
@@ -207,6 +194,7 @@ export async function evaluateHost(
 }
 
 export async function evaluateLogic(
+  trigger: ITrigger,
   parsedExpression: (string | string[])[],
   itemPosition: number,
   item: IItem,
@@ -365,6 +353,21 @@ export async function evaluateLogic(
     console.log(`[${new Date().toLocaleString()}] Invalid function name`);
   }
 
+  trigger.items.findIndex(([itemName, itemId]) => {
+    if (itemName === item.item_name) {
+      trigger.valueItem[
+        trigger.items.findIndex(([itemName, itemId]) => {
+          if (itemName === item.item_name) {
+            return true;
+          }
+        })
+      ] = value;
+      return true;
+    }
+  });
+
+  await trigger.save();
+
   switch (operator) {
     case ">":
       return { result: value > numericThreshold, value };
@@ -505,6 +508,8 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
                 clearInterval(schedulesWaitAlert[trigger._id as string]);
                 delete schedulesWaitAlert[trigger._id as string];
               }
+              clearInterval(schedulesWaitRecovery[trigger._id as string]);
+              delete schedulesWaitRecovery[trigger._id as string];
             },
             item.interval * 1000 * 3
           );
@@ -582,9 +587,23 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       "{HOST.IP}": host?.ip_address ?? "Unknown IP",
       //Event
       "{EVENT.STATUS}": event.status,
-      "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString(),
+      "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString("th-TH", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
       "{EVENT.RESOLVED.TIMESTAMP}": event.resolvedAt
-        ? event.resolvedAt.toLocaleString()
+        ? event.resolvedAt.toLocaleString("th-TH", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
         : "",
     };
 
@@ -809,6 +828,7 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
 
 async function recoverOrDownSeverity(trigger: ITrigger) {
   try {
+    const t = await Trigger.findById(trigger._id);
     const dependentTriggersHigher = await findDependentTriggerHigher(trigger);
     const dependentTriggersLower = await findDependentTriggerLower(trigger);
     if (
@@ -832,7 +852,7 @@ async function recoverOrDownSeverity(trigger: ITrigger) {
         });
         await sendNotificationItem(
           eventResolved ? eventResolved : event,
-          trigger
+          t ? t : trigger
         );
       }
     }
