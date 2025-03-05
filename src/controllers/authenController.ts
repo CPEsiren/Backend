@@ -12,17 +12,32 @@ export const loginUser = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid or unverified token" });
     }
 
-    let user = await User.findOneAndUpdate(
-      { email: userInfo.email },
-      {
+    const userTotal = await User.find({});
+
+    let user: IUser;
+
+    if (userTotal.length === 0) {
+      user = await User.create({
         username: userInfo.name,
         email: userInfo.email,
         picture: userInfo.picture,
         tokenExp: new Date(userInfo.exp * 1000),
         token,
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+        role: "superadmin",
+      });
+    } else {
+      user = await User.findOneAndUpdate(
+        { email: userInfo.email },
+        {
+          username: userInfo.name,
+          email: userInfo.email,
+          picture: userInfo.picture,
+          tokenExp: new Date(userInfo.exp * 1000),
+          token,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+    }
 
     res.status(200).json({
       message: `User [${user.username}] logged in successfully`,
