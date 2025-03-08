@@ -473,13 +473,14 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
           clearInterval(schedulesWaitAlert[trigger._id as string]);
           delete schedulesWaitAlert[trigger._id as string];
         }
-      } else if (!sumLogicExpr && !sumLogicRecoveryExpr) {
-        await recoverOrDownSeverity(trigger);
-        if (schedulesWaitAlert[trigger._id as string]) {
-          clearInterval(schedulesWaitAlert[trigger._id as string]);
-          delete schedulesWaitAlert[trigger._id as string];
-        }
       }
+      // else if (!sumLogicExpr && !sumLogicRecoveryExpr) {
+      //   await recoverOrDownSeverity(trigger);
+      //   if (schedulesWaitAlert[trigger._id as string]) {
+      //     clearInterval(schedulesWaitAlert[trigger._id as string]);
+      //     delete schedulesWaitAlert[trigger._id as string];
+      //   }
+      // }
     } else if (trigger.ok_event_generation === "expression") {
       if (sumLogicExpr) {
         if (schedulesWaitRecovery[trigger._id as string]) {
@@ -657,7 +658,11 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
           thisitem?.type === "counter"
             ? `${thisitem.unit}/s`
             : `${thisitem?.unit}`;
-        return `${trigger.expressionPart[index].functionofItem} ${thisitem?.item_name} in ${trigger.expressionPart[index].duration} : ${trigger.valueItem[index]} ${unit}`;
+        return `${trigger.expressionPart[index].functionofItem} ${
+          thisitem?.item_name
+        } in ${
+          trigger.expressionPart[index].duration
+        } : ${formatNumberWithSuffix(`${trigger.valueItem[index]}`)} ${unit}`;
       })
     );
 
@@ -676,12 +681,7 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
               formatNumberWithSuffix(match)
             ),
       "{TRIGGER.SEVERITY}": trigger.severity,
-      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue
-        .map((item) => {
-          const [description, value] = item.split(" : ");
-          return `${description} : ${formatNumberWithSuffix(value)}`;
-        })
-        .join("\n"),
+      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue.join("\n"),
       //Host
       "{HOST.NAME}": host?.hostname ?? event.hostname,
       "{HOST.IP}": host?.ip_address ?? "Unknown IP",
