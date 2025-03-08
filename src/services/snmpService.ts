@@ -182,8 +182,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
                 // );
                 await checkCondition(
                   host._id as mongoose.Types.ObjectId,
-                  itembandwidth,
-                  bandwidthUtilization
+                  itembandwidth
                 );
               }
             }
@@ -213,7 +212,7 @@ export async function fetchAndStoreSnmpDataForItem(item: IItem) {
 
         session.close();
 
-        await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
+        await checkCondition(host._id as mongoose.Types.ObjectId, item);
       }
     } catch (error) {
       console.log(
@@ -346,7 +345,7 @@ export async function fetchAndStoreTotalTraffic(item: IItem) {
 
       session.close();
 
-      await checkCondition(host._id as mongoose.Types.ObjectId, item, value);
+      await checkCondition(host._id as mongoose.Types.ObjectId, item);
     }
   } catch (error) {
     console.log(
