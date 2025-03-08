@@ -10,12 +10,11 @@ import {
 import Host, { IHost } from "../models/Host";
 import Event, { IEvent } from "../models/Event";
 import Data from "../models/Data";
-import { IItem } from "../models/Item";
+import Item, { IItem } from "../models/Item";
 
 export async function checkCondition(
   host_id: mongoose.Types.ObjectId,
-  item: IItem,
-  valuelasted: number
+  item: IItem
 ) {
   try {
     const triggers = await Trigger.find({
@@ -651,21 +650,38 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       return;
     }
 
-    const allItemandValue = trigger.items.map((item, index) => {
-      return `${trigger.expressionPart[index].functionofItem} ${item[0]} in ${trigger.expressionPart[index].duration} : ${trigger.valueItem[index]}`;
-    });
+    const allItemandValue = await Promise.all(
+      trigger.items.map(async (item, index) => {
+        const thisitem = await Item.findById(item[1]);
+        const unit =
+          thisitem?.type === "counter"
+            ? `${thisitem.unit}/s`
+            : `${thisitem?.unit}`;
+        return `${trigger.expressionPart[index].functionofItem} ${thisitem?.item_name} in ${trigger.expressionPart[index].duration} : ${trigger.valueItem[index]} ${unit}`;
+      })
+    );
 
     const replacement: Record<string, string> = {
       //Trigger
       "{TRIGGER.NAME}": trigger.trigger_name,
-      "{TRIGGER.EXPRESSION}": trigger.expression,
+      "{TRIGGER.EXPRESSION}": trigger.expression.replace(
+        /(\d+(\.\d+)?)$/,
+        (match) => formatNumberWithSuffix(match)
+      ),
       "{TRIGGER.RESOLVED.EXPRESSION}":
         trigger.recovery_expression === "" ||
         trigger.recovery_expression === "(,)"
           ? "None"
-          : trigger.recovery_expression,
+          : trigger.recovery_expression.replace(/(\d+(\.\d+)?)$/, (match) =>
+              formatNumberWithSuffix(match)
+            ),
       "{TRIGGER.SEVERITY}": trigger.severity,
-      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue.join("\n"),
+      "{TRIGGER.ALL.ITEM&VALUE}": allItemandValue
+        .map((item) => {
+          const [description, value] = item.split(" : ");
+          return `${description} : ${formatNumberWithSuffix(value)}`;
+        })
+        .join("\n"),
       //Host
       "{HOST.NAME}": host?.hostname ?? event.hostname,
       "{HOST.IP}": host?.ip_address ?? "Unknown IP",
@@ -853,7 +869,9 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
               severity: trigger.severity,
               hostname: host?.hostname,
               status: "PROBLEM",
-              message: trigger.expression,
+              message: trigger.expression.replace(/(\d+(\.\d+)?)$/, (match) =>
+                formatNumberWithSuffix(match)
+              ),
             },
             {
               upsert: true,
@@ -872,7 +890,9 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
             {
               trigger_id: trigger._id,
               severity: trigger.severity,
-              message: trigger.expression,
+              message: trigger.expression.replace(/(\d+(\.\d+)?)$/, (match) =>
+                formatNumberWithSuffix(match)
+              ),
               createdAt: new Date(),
             }
           );
@@ -894,7 +914,10 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
           {
             trigger_id: dependentTriggersHigher[0]._id,
             severity: dependentTriggersHigher[0].severity,
-            message: dependentTriggersHigher[0].expression,
+            message: dependentTriggersHigher[0].expression.replace(
+              /(\d+(\.\d+)?)$/,
+              (match) => formatNumberWithSuffix(match)
+            ),
             createdAt: new Date(),
           }
         );
@@ -937,7 +960,9 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
               severity: trigger.severity,
               hostname: host?.hostname,
               status: "PROBLEM",
-              message: trigger.expression,
+              message: trigger.expression.replace(/(\d+(\.\d+)?)$/, (match) =>
+                formatNumberWithSuffix(match)
+              ),
             },
             {
               upsert: true,
@@ -959,7 +984,9 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
             {
               trigger_id: trigger._id,
               severity: trigger.severity,
-              message: trigger.expression,
+              message: trigger.expression.replace(/(\d+(\.\d+)?)$/, (match) =>
+                formatNumberWithSuffix(match)
+              ),
               createdAt: new Date(),
             }
           );
@@ -981,7 +1008,10 @@ async function problemOrUpSeverity(t: ITrigger, host: IHost | null) {
           {
             trigger_id: dependentTriggersHigher[0]._id,
             severity: dependentTriggersHigher[0].severity,
-            message: dependentTriggersHigher[0].expression,
+            message: dependentTriggersHigher[0].expression.replace(
+              /(\d+(\.\d+)?)$/,
+              (match) => formatNumberWithSuffix(match)
+            ),
             createdAt: new Date(),
           }
         );
@@ -1224,4 +1254,13 @@ const replaceAll = (
   return Object.keys(replacements).reduce((acc, key) => {
     return acc.replace(new RegExp(key, "g"), replacements[key]);
   }, str);
+};
+
+const formatNumberWithSuffix = (value: string) => {
+  const number = parseFloat(value);
+  const suffixes = ["", "K", "M", "B", "T"];
+  const suffixNum = Math.floor(Math.log10(Math.abs(number)) / 3);
+  const shortValue = (number / Math.pow(1000, suffixNum)).toFixed(1);
+
+  return parseFloat(shortValue) + " " + suffixes[suffixNum];
 };

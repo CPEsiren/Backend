@@ -107,6 +107,17 @@ const createMedia = async (req: Request, res: Response) => {
         .json({ status: "fail", message: "User not found" });
     }
 
+    const mediaAlreadyExists = await Media.findOne({
+      recipient,
+    });
+
+    if (mediaAlreadyExists) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Media already exists",
+      });
+    }
+
     const newMedia = new Media({
       user_id,
       type,

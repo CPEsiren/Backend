@@ -117,27 +117,13 @@ export const updateTemplate = async (req: Request, res: Response) => {
       });
     }
 
-    const changes = Object.keys(updateData)
-      .filter(
-        (key) =>
-          JSON.stringify(updateData[key]) !==
-          JSON.stringify(originalTemplate[key as keyof typeof originalTemplate])
-      )
-      .map(
-        (key) =>
-          `${key}: ${JSON.stringify(
-            originalTemplate[key as keyof typeof originalTemplate]
-          )} → ${JSON.stringify(updateData[key])}`
-      )
-      .join("\n");
-
     // Log for activity
     const username = req.body.userName || "system";
     const role = req.body.userRole || "system";
     await createActivityLog(
       username,
       role,
-      `Updated host: ${updatedTemplate.template_name}. Changes:\n${changes}`
+      `Updated host: ${updatedTemplate.template_name}.`
     );
 
     res.status(200).json({
