@@ -493,6 +493,11 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
             item.interval * 1000 * 3
           );
         }
+      } else if (!sumLogicExpr && !sumLogicRecoveryExpr) {
+        if (schedulesWaitAlert[trigger._id as string]) {
+          clearInterval(schedulesWaitAlert[trigger._id as string]);
+          delete schedulesWaitAlert[trigger._id as string];
+        }
       }
     } else if (trigger.ok_event_generation === "expression") {
       if (sumLogicExpr) {
