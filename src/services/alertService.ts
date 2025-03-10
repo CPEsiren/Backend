@@ -701,6 +701,7 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       //Event
       "{EVENT.STATUS}": event.status,
       "{EVENT.PROBLEM.TIMESTAMP}": event.createdAt.toLocaleString("th-TH", {
+        timeZone: "Asia/Bangkok",
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -710,6 +711,7 @@ export async function sendNotificationItem(event: IEvent, trigger: ITrigger) {
       }),
       "{EVENT.RESOLVED.TIMESTAMP}": event.resolvedAt
         ? event.resolvedAt.toLocaleString("th-TH", {
+            timeZone: "Asia/Bangkok",
             day: "2-digit",
             month: "2-digit",
             year: "numeric",
