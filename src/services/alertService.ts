@@ -449,12 +449,24 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
 
     if (trigger.ok_event_generation === "resolved expression") {
       if (sumLogicExpr && sumLogicRecoveryExpr) {
-        await recoverOrDownSeverity(trigger);
         if (schedulesWaitAlert[trigger._id as string]) {
           clearInterval(schedulesWaitAlert[trigger._id as string]);
           delete schedulesWaitAlert[trigger._id as string];
         }
+
+        if (!schedulesWaitRecovery[trigger._id as string]) {
+          schedulesWaitRecovery[trigger._id as string] = setInterval(
+            async () => {
+              await recoverOrDownSeverity(trigger);
+            },
+            item.interval * 1000 * 3
+          );
+        }
       } else if (sumLogicExpr && !sumLogicRecoveryExpr) {
+        if (schedulesWaitRecovery[trigger._id as string]) {
+          clearInterval(schedulesWaitRecovery[trigger._id as string]);
+          delete schedulesWaitRecovery[trigger._id as string];
+        }
         if (trigger.thresholdDuration === 0) {
           await problemOrUpSeverity(trigger, host);
         } else {
@@ -468,19 +480,20 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
           }
         }
       } else if (!sumLogicExpr && sumLogicRecoveryExpr) {
-        await recoverOrDownSeverity(trigger);
         if (schedulesWaitAlert[trigger._id as string]) {
           clearInterval(schedulesWaitAlert[trigger._id as string]);
           delete schedulesWaitAlert[trigger._id as string];
         }
+
+        if (!schedulesWaitRecovery[trigger._id as string]) {
+          schedulesWaitRecovery[trigger._id as string] = setInterval(
+            async () => {
+              await recoverOrDownSeverity(trigger);
+            },
+            item.interval * 1000 * 3
+          );
+        }
       }
-      // else if (!sumLogicExpr && !sumLogicRecoveryExpr) {
-      //   await recoverOrDownSeverity(trigger);
-      //   if (schedulesWaitAlert[trigger._id as string]) {
-      //     clearInterval(schedulesWaitAlert[trigger._id as string]);
-      //     delete schedulesWaitAlert[trigger._id as string];
-      //   }
-      // }
     } else if (trigger.ok_event_generation === "expression") {
       if (sumLogicExpr) {
         if (schedulesWaitRecovery[trigger._id as string]) {
