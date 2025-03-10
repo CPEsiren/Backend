@@ -163,7 +163,7 @@ export const createHost = async (req: Request, res: Response) => {
       },
       {
         item_name: "Total Outbound Traffic",
-        oid: "1.3.6.1.2.1.2.2.1.10",
+        oid: "1.3.6.1.2.1.2.2.1.16",
         type: "counter",
         unit: "bit",
         interval: 60,
