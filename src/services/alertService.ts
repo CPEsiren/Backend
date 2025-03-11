@@ -498,6 +498,10 @@ async function handleTrigger(trigger: ITrigger, item: IItem) {
           clearInterval(schedulesWaitAlert[trigger._id as string]);
           delete schedulesWaitAlert[trigger._id as string];
         }
+        if (schedulesWaitRecovery[trigger._id as string]) {
+          clearInterval(schedulesWaitRecovery[trigger._id as string]);
+          delete schedulesWaitRecovery[trigger._id as string];
+        }
       }
     } else if (trigger.ok_event_generation === "expression") {
       if (sumLogicExpr) {
