@@ -532,14 +532,14 @@ export async function checkSnmpConnection(host_id: string) {
           );
         }
       } else {
+        const totalSeconds = Math.floor(varbinds[0].value / 100);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
         const message = `${host.hostname} [${host.ip_address}] is up.`;
         const updatedDetails = {
           ...host.details,
-          UpTime: `${Math.floor(
-            varbinds[0].value / 100 / 3600
-          )} hours ${Math.floor(
-            ((varbinds[0].value / 100) % 3600) / 60
-          )} minutes`,
+          UpTime: `${days} days, ${hours} hours, ${minutes} minutes`,
         };
         await Host.findByIdAndUpdate(host_id, {
           details: updatedDetails,
@@ -924,9 +924,12 @@ export async function fetchDetailHost(
       if (!snmp.isVarbindError(varbind)) {
         const key = Object.keys(SYSTEM_DETAIL_OIDS)[index] as SystemDetailKey;
         if (key === "UpTime") {
-          details[key] = `${Math.floor(
-            varbind.value / 100 / 3600
-          )} hours ${Math.floor(((varbind.value / 100) % 3600) / 60)} minutes`;
+          const totalSeconds = Math.floor(varbind.value / 100);
+          const days = Math.floor(totalSeconds / 86400);
+          const hours = Math.floor((totalSeconds % 86400) / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+          details[key] = `${days} days, ${hours} hours, ${minutes} minutes`;
         } else {
           details[key] = varbind.value.toString();
         }
